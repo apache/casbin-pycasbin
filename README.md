@@ -309,7 +309,7 @@ This project exists thanks to all the people who contribute.
 
 ## Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=apache/casbin-pycasbin&type=Date)](https://star-history.com/#apache/casbin-pycasbin&Date)
+[![Star History Chart](https://star-history.dera.page/svg?repos=apache/casbin-pycasbin&type=Date)](https://star-history.dera.page/#apache/casbin-pycasbin&Date)
 
 ## License
 
