@@ -107,7 +107,7 @@ def key_get2(key1, key2, path_var):
 
 
 def key_match3(key1, key2):
-    """determines determines whether key1 matches the pattern of key2 (similar to RESTful path), key2 can contain a *.
+    """determines whether key1 matches the pattern of key2 (similar to RESTful path), key2 can contain a *.
     For example, "/foo/bar" matches "/foo/*", "/resource1" matches "/{resource}"
     """
 
