@@ -23,7 +23,7 @@ class Effector:
     DENY = 2
 
     def intermediate_effect(self, effects):
-        """returns a intermediate effect based on the matched effects of the enforcer"""
+        """returns an intermediate effect based on the matched effects of the enforcer"""
         pass
 
     def final_effect(self, effects):

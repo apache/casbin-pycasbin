@@ -17,7 +17,7 @@ from .effector import Effector
 
 class AllowOverrideEffector(Effector):
     def intermediate_effect(self, effects):
-        """returns a intermediate effect based on the matched effects of the enforcer"""
+        """returns an intermediate effect based on the matched effects of the enforcer"""
         if Effector.ALLOW in effects:
             return Effector.ALLOW
         return Effector.INDETERMINATE
@@ -31,7 +31,7 @@ class AllowOverrideEffector(Effector):
 
 class DenyOverrideEffector(Effector):
     def intermediate_effect(self, effects):
-        """returns a intermediate effect based on the matched effects of the enforcer"""
+        """returns an intermediate effect based on the matched effects of the enforcer"""
         if Effector.DENY in effects:
             return Effector.DENY
         return Effector.INDETERMINATE
@@ -45,7 +45,7 @@ class DenyOverrideEffector(Effector):
 
 class AllowAndDenyEffector(Effector):
     def intermediate_effect(self, effects):
-        """returns a intermediate effect based on the matched effects of the enforcer"""
+        """returns an intermediate effect based on the matched effects of the enforcer"""
         if Effector.DENY in effects:
             return Effector.DENY
         return Effector.INDETERMINATE
@@ -59,7 +59,7 @@ class AllowAndDenyEffector(Effector):
 
 class PriorityEffector(Effector):
     def intermediate_effect(self, effects):
-        """returns a intermediate effect based on the matched effects of the enforcer"""
+        """returns an intermediate effect based on the matched effects of the enforcer"""
         if Effector.ALLOW in effects:
             return Effector.ALLOW
         if Effector.DENY in effects:
