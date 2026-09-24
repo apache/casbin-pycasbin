@@ -14,7 +14,7 @@
 
 from unittest import TestCase
 from casbin.rbac import default_role_manager
-from casbin.util import regex_match_func
+from casbin.util import key_match, regex_match_func
 import time
 from concurrent.futures import ThreadPoolExecutor
 import re
@@ -261,6 +261,23 @@ class TestRoleManager(TestCase):
         for future in futures:
             self.assertTrue(future.result())
 
+    def test_delete_link_without_matching_func(self):
+        rm = self.get_role_manager()
+        rm.add_matching_func(None)
+        rm.add_link("u*", "g1")
+        rm.add_link("u1", "g2")
+        rm.add_link("g1", "g*")
+        self.assertFalse(rm.has_link("u1", "g1"))
+
+        rm.delete_link("u*", "g1")
+
+        self.assertFalse(rm.has_link("u*", "g1"))
+        self.assertFalse(rm.has_link("u*", "g*"))
+        self.assertTrue(rm.has_link("u1", "g2"))
+        self.assertTrue(rm.has_link("g1", "g*"))
+        self.assertEqual(rm.get_roles("u*"), [])
+        self.assertEqual(rm.get_users("g1"), [])
+
 
 class TestDomainManager(TestRoleManager):
     def get_role_manager(self):
@@ -313,3 +330,20 @@ class TestDomainManager(TestRoleManager):
         self.assertTrue(rm.has_link("alice", "users", "domain1"))
         self.assertTrue(rm.has_link("alice", "user", "domain2"))
         self.assertFalse(rm.has_link("alice", "users", "domain2"))
+
+    def test_delete_link_without_matching_func_across_domains(self):
+        rm = self.get_role_manager()
+        rm.add_matching_func(None)
+        rm.add_domain_matching_func(key_match)
+        rm.add_link("alice", "admin", "*")
+        rm.add_link("bob", "admin", "*")
+        domains = ["d1", "d2", "d3"]
+        for d in domains:
+            self.assertTrue(rm.has_link("alice", "admin", d))
+
+        rm.delete_link("alice", "admin", "*")
+
+        for d in domains:
+            self.assertFalse(rm.has_link("alice", "admin", d))
+            self.assertTrue(rm.has_link("bob", "admin", d))
+        self.assertFalse(rm.has_link("alice", "admin", "d4"))

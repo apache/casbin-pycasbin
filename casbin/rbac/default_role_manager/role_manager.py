@@ -158,7 +158,7 @@ class RoleManager(RM):
 
         user.add_role(role)
 
-        if self.matching_func != None:
+        if self.matching_func is not None:
             for r in self.all_roles.values():
                 if r.name != user.name and self._matching_fn(user.name, r.name, MatchOrder.PATTERN_STR):
                     r.add_role(role)
@@ -174,11 +174,12 @@ class RoleManager(RM):
         role = self._get_role(name2)
         user.remove_role(role)
 
-        for r in self.all_roles.values():
-            if r.name != user.name and self._matching_fn(user.name, r.name, MatchOrder.PATTERN_STR):
-                r.remove_role(role)
-            if r.name != role.name and self._matching_fn(role.name, r.name, MatchOrder.PATTERN_STR):
-                role.remove_role(r)
+        if self.matching_func is not None:
+            for r in self.all_roles.values():
+                if r.name != user.name and self._matching_fn(user.name, r.name, MatchOrder.PATTERN_STR):
+                    r.remove_role(role)
+                if r.name != role.name and self._matching_fn(role.name, r.name, MatchOrder.PATTERN_STR):
+                    role.remove_role(r)
 
     def has_link(self, name1, name2, *domain):
         user = self._get_role(name1)
