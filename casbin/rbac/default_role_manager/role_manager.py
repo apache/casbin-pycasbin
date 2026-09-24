@@ -133,7 +133,7 @@ class RoleManager(RM):
     def _get_role(self, name):
         if name not in self.all_roles:
             role = Role(name)
-            if self.matching_func != None:
+            if self.matching_func is not None:
                 for pattern_role in self._matching_roles(name):
                     role.copy_from(pattern_role)
             self.all_roles[name] = role
@@ -256,7 +256,7 @@ class DomainManagerBase(RM):
         domain1 = self._get_domain(*domain)
         domain_links = self.all_links.get(domain1, [])
 
-        if self.domain_matching_func != None:
+        if self.domain_matching_func is not None:
             for domain2, links in self.all_links.items():
                 if domain1 != domain2 and match_error_handler(self.domain_matching_func, domain1, domain2):
                     domain_links = domain_links + links
@@ -314,7 +314,7 @@ class DomainManager(DomainManagerBase):
     def _affected_role_managers(self, *domain):
         domain_pattern = self._get_domain(*domain)
 
-        if self.domain_matching_func != None:
+        if self.domain_matching_func is not None:
             return [
                 self.rm_map[domain_str]
                 for domain_str in self.rm_map.keys()
