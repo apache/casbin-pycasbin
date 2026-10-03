@@ -13,18 +13,18 @@ PyCasbin
 
 **News**: Async is now supported by Pycasbin >= 1.23.0!
 
-**News**: still worry about how to write the correct Casbin policy? ``Casbin online editor`` is coming to help! Try it at: http://casbin.org/editor/
+**News**: still worry about how to write the correct Casbin policy? ``Casbin online editor`` is coming to help! Try it at: https://editor.casbin.org/
 
 Casbin is a powerful and efficient open-source access control library for Python projects. It provides support for enforcing authorization based on various [access control models](https://en.wikipedia.org/wiki/Computer_security_model).
 
 ## All the languages supported by Casbin:
 
-| [![golang](https://casbin.org/img/langs/golang.png)](https://github.com/casbin/casbin) | [![java](https://casbin.org/img/langs/java.png)](https://github.com/casbin/jcasbin) | [![nodejs](https://casbin.org/img/langs/nodejs.png)](https://github.com/casbin/node-casbin) | [![php](https://casbin.org/img/langs/php.png)](https://github.com/php-casbin/php-casbin) |
+| [![golang](https://casbin.apache.org/img/langs/golang.png)](https://github.com/casbin/casbin) | [![java](https://casbin.apache.org/img/langs/java.png)](https://github.com/casbin/jcasbin) | [![nodejs](https://casbin.apache.org/img/langs/nodejs.png)](https://github.com/casbin/node-casbin) | [![php](https://casbin.apache.org/img/langs/php.png)](https://github.com/php-casbin/php-casbin) |
 |----------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------|
 | [Casbin](https://github.com/casbin/casbin)                                             | [jCasbin](https://github.com/casbin/jcasbin)                                        | [node-Casbin](https://github.com/casbin/node-casbin)                                        | [PHP-Casbin](https://github.com/php-casbin/php-casbin)                                   |
 | production-ready                                                                       | production-ready                                                                    | production-ready                                                                            | production-ready                                                                         |
 
-| [![python](https://casbin.org/img/langs/python.png)](https://github.com/apache/casbin-pycasbin) | [![dotnet](https://casbin.org/img/langs/dotnet.png)](https://github.com/casbin-net/Casbin.NET) | [![c++](https://casbin.org/img/langs/cpp.png)](https://github.com/casbin/casbin-cpp) | [![rust](https://casbin.org/img/langs/rust.png)](https://github.com/casbin/casbin-rs) |
+| [![python](https://casbin.apache.org/img/langs/python.png)](https://github.com/apache/casbin-pycasbin) | [![dotnet](https://casbin.apache.org/img/langs/dotnet.png)](https://github.com/casbin-net/Casbin.NET) | [![c++](https://casbin.apache.org/img/langs/cpp.png)](https://github.com/casbin/casbin-cpp) | [![rust](https://casbin.apache.org/img/langs/rust.png)](https://github.com/casbin/casbin-rs) |
 |------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------|
 | [PyCasbin](https://github.com/apache/casbin-pycasbin)                                           | [Casbin.NET](https://github.com/casbin-net/Casbin.NET)                                         | [Casbin-CPP](https://github.com/casbin/casbin-cpp)                                   | [Casbin-RS](https://github.com/casbin/casbin-rs)                                      |
 | production-ready                                                                         | production-ready                                                                               | beta-test                                                                            | production-ready                                                                      |
@@ -144,15 +144,15 @@ pip install pycasbin
 
 ## Documentation
 
-https://casbin.org/docs/overview
+https://casbin.apache.org/docs/overview/
 
 ## Online editor
 
-You can also use the online editor (http://casbin.org/editor/) to write your Casbin model and policy in your web browser. It provides functionality such as ``syntax highlighting`` and ``code completion``, just like an IDE for a programming language.
+You can also use the online editor (https://editor.casbin.org/) to write your Casbin model and policy in your web browser. It provides functionality such as ``syntax highlighting`` and ``code completion``, just like an IDE for a programming language.
 
 ## Tutorials
 
-https://casbin.org/docs/tutorials
+https://casbin.apache.org/docs/tutorials/
 
 ## Get started
 
@@ -205,11 +205,11 @@ We also provide a web-based UI for model management and policy management:
 
 ## Policy persistence
 
-https://casbin.org/docs/adapters
+https://casbin.apache.org/docs/adapters/
 
 ## Role manager
 
-https://casbin.org/docs/role-managers
+https://casbin.apache.org/docs/role-managers/
 
 ## Async Enforcer
 
@@ -247,7 +247,7 @@ async def get_enforcer():
     return e
 ```
 
-Note: you can see all supported adapters in [Adapters | Casbin](https://casbin.org/docs/adapters).
+Note: you can see all supported adapters in [Adapters | Casbin](https://casbin.apache.org/docs/adapters/).
 
 Built-in async adapters are available in `casbin.persist.adapters.asyncio`.
 
@@ -272,7 +272,7 @@ asyncio.run(main())
 
 ## Benchmarks
 
-https://casbin.org/docs/benchmark
+https://casbin.apache.org/docs/benchmark/
 
 ## Logging
 
@@ -296,11 +296,11 @@ pycasbin leverages the default Python logging mechanism. The pycasbin package ma
 
 ## Middlewares
 
-Authz middlewares for web frameworks: https://casbin.org/docs/middlewares
+Authz middlewares for web frameworks: https://casbin.apache.org/docs/middlewares/
 
 ## Our adopters
 
-https://casbin.org/docs/adopters
+https://casbin.apache.org/docs/adopters/
 
 ## Contributors
 
