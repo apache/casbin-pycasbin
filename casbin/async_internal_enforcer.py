@@ -133,18 +133,18 @@ class AsyncInternalEnforcer(CoreEnforcer):
             if result is False:
                 return False
 
-            if self.watcher and self.auto_notify_watcher:
-                update_for_add_policy = getattr(self.watcher, "update_for_add_policy", None)
-                if callable(update_for_add_policy):
-                    if inspect.iscoroutinefunction(update_for_add_policy):
-                        await update_for_add_policy(sec, ptype, rule)
-                    else:
-                        update_for_add_policy(sec, ptype, rule)
+        if self.watcher and self.auto_notify_watcher:
+            update_for_add_policy = getattr(self.watcher, "update_for_add_policy", None)
+            if callable(update_for_add_policy):
+                if inspect.iscoroutinefunction(update_for_add_policy):
+                    await update_for_add_policy(sec, ptype, rule)
                 else:
-                    if inspect.iscoroutinefunction(self.watcher.update):
-                        await self.watcher.update()
-                    else:
-                        self.watcher.update()
+                    update_for_add_policy(sec, ptype, rule)
+            else:
+                if inspect.iscoroutinefunction(self.watcher.update):
+                    await self.watcher.update()
+                else:
+                    self.watcher.update()
 
         rule_added = self.model.add_policy(sec, ptype, rule)
 
@@ -164,18 +164,18 @@ class AsyncInternalEnforcer(CoreEnforcer):
             if result is False:
                 return False
 
-            if self.watcher and self.auto_notify_watcher:
-                update_for_add_policies = getattr(self.watcher, "update_for_add_policies", None)
-                if callable(update_for_add_policies):
-                    if inspect.iscoroutinefunction(update_for_add_policies):
-                        await update_for_add_policies(sec, ptype, rules)
-                    else:
-                        update_for_add_policies(sec, ptype, rules)
+        if self.watcher and self.auto_notify_watcher:
+            update_for_add_policies = getattr(self.watcher, "update_for_add_policies", None)
+            if callable(update_for_add_policies):
+                if inspect.iscoroutinefunction(update_for_add_policies):
+                    await update_for_add_policies(sec, ptype, rules)
                 else:
-                    if inspect.iscoroutinefunction(self.watcher.update):
-                        await self.watcher.update()
-                    else:
-                        self.watcher.update()
+                    update_for_add_policies(sec, ptype, rules)
+            else:
+                if inspect.iscoroutinefunction(self.watcher.update):
+                    await self.watcher.update()
+                else:
+                    self.watcher.update()
 
         rules_added = self.model.add_policies(sec, ptype, rules)
 
@@ -193,11 +193,11 @@ class AsyncInternalEnforcer(CoreEnforcer):
             if result is False:
                 return False
 
-            if self.watcher and self.auto_notify_watcher:
-                if inspect.iscoroutinefunction(self.watcher.update):
-                    await self.watcher.update()
-                else:
-                    self.watcher.update()
+        if self.watcher and self.auto_notify_watcher:
+            if inspect.iscoroutinefunction(self.watcher.update):
+                await self.watcher.update()
+            else:
+                self.watcher.update()
 
         return rule_updated
 
@@ -213,11 +213,11 @@ class AsyncInternalEnforcer(CoreEnforcer):
             if result is False:
                 return False
 
-            if self.watcher and self.auto_notify_watcher:
-                if inspect.iscoroutinefunction(self.watcher.update):
-                    await self.watcher.update()
-                else:
-                    self.watcher.update()
+        if self.watcher and self.auto_notify_watcher:
+            if inspect.iscoroutinefunction(self.watcher.update):
+                await self.watcher.update()
+            else:
+                self.watcher.update()
 
         return rules_updated
 
@@ -262,18 +262,18 @@ class AsyncInternalEnforcer(CoreEnforcer):
             if result is False:
                 return False
 
-            if self.watcher and self.auto_notify_watcher:
-                update_for_remove_policy = getattr(self.watcher, "update_for_remove_policy", None)
-                if callable(update_for_remove_policy):
-                    if inspect.iscoroutinefunction(update_for_remove_policy):
-                        await update_for_remove_policy(sec, ptype, rule)
-                    else:
-                        update_for_remove_policy(sec, ptype, rule)
+        if self.watcher and self.auto_notify_watcher:
+            update_for_remove_policy = getattr(self.watcher, "update_for_remove_policy", None)
+            if callable(update_for_remove_policy):
+                if inspect.iscoroutinefunction(update_for_remove_policy):
+                    await update_for_remove_policy(sec, ptype, rule)
                 else:
-                    if inspect.iscoroutinefunction(self.watcher.update):
-                        await self.watcher.update()
-                    else:
-                        self.watcher.update()
+                    update_for_remove_policy(sec, ptype, rule)
+            else:
+                if inspect.iscoroutinefunction(self.watcher.update):
+                    await self.watcher.update()
+                else:
+                    self.watcher.update()
 
         return rule_removed
 
@@ -291,18 +291,18 @@ class AsyncInternalEnforcer(CoreEnforcer):
             if result is False:
                 return False
 
-            if self.watcher and self.auto_notify_watcher:
-                update_for_remove_policies = getattr(self.watcher, "update_for_remove_policies", None)
-                if callable(update_for_remove_policies):
-                    if inspect.iscoroutinefunction(update_for_remove_policies):
-                        await update_for_remove_policies(sec, ptype, rules)
-                    else:
-                        update_for_remove_policies(sec, ptype, rules)
+        if self.watcher and self.auto_notify_watcher:
+            update_for_remove_policies = getattr(self.watcher, "update_for_remove_policies", None)
+            if callable(update_for_remove_policies):
+                if inspect.iscoroutinefunction(update_for_remove_policies):
+                    await update_for_remove_policies(sec, ptype, rules)
                 else:
-                    if inspect.iscoroutinefunction(self.watcher.update):
-                        await self.watcher.update()
-                    else:
-                        self.watcher.update()
+                    update_for_remove_policies(sec, ptype, rules)
+            else:
+                if inspect.iscoroutinefunction(self.watcher.update):
+                    await self.watcher.update()
+                else:
+                    self.watcher.update()
 
         return rules_removed
 
@@ -317,18 +317,18 @@ class AsyncInternalEnforcer(CoreEnforcer):
             if result is False:
                 return False
 
-            if self.watcher and self.auto_notify_watcher:
-                update_for_remove_filtered_policy = getattr(self.watcher, "update_for_remove_filtered_policy", None)
-                if callable(update_for_remove_filtered_policy):
-                    if inspect.iscoroutinefunction(update_for_remove_filtered_policy):
-                        await update_for_remove_filtered_policy(sec, ptype, field_index, *field_values)
-                    else:
-                        update_for_remove_filtered_policy(sec, ptype, field_index, *field_values)
+        if self.watcher and self.auto_notify_watcher:
+            update_for_remove_filtered_policy = getattr(self.watcher, "update_for_remove_filtered_policy", None)
+            if callable(update_for_remove_filtered_policy):
+                if inspect.iscoroutinefunction(update_for_remove_filtered_policy):
+                    await update_for_remove_filtered_policy(sec, ptype, field_index, *field_values)
                 else:
-                    if inspect.iscoroutinefunction(self.watcher.update):
-                        await self.watcher.update()
-                    else:
-                        self.watcher.update()
+                    update_for_remove_filtered_policy(sec, ptype, field_index, *field_values)
+            else:
+                if inspect.iscoroutinefunction(self.watcher.update):
+                    await self.watcher.update()
+                else:
+                    self.watcher.update()
 
         return rule_removed
 
@@ -343,11 +343,11 @@ class AsyncInternalEnforcer(CoreEnforcer):
             if result is False:
                 return False
 
-            if self.watcher and self.auto_notify_watcher:
-                if inspect.iscoroutinefunction(self.watcher.update):
-                    await self.watcher.update()
-                else:
-                    self.watcher.update()
+        if self.watcher and self.auto_notify_watcher:
+            if inspect.iscoroutinefunction(self.watcher.update):
+                await self.watcher.update()
+            else:
+                self.watcher.update()
 
         return rule_removed
 

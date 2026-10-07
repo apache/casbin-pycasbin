@@ -286,6 +286,35 @@ class TestWatcherEx(TestCaseBase):
         e.remove_policies(rules)
         self.assertEqual(w.notify_message, None)
 
+    def test_auto_notify_with_auto_save_disabled(self):
+        e = self.get_enforcer(
+            get_examples("basic_model.conf"),
+            get_examples_copy("basic_policy.csv"),
+        )
+        w = SampleWatcher()
+        e.set_watcher(w)
+        e.enable_auto_save(False)
+        e.enable_auto_notify_watcher(True)
+
+        e.add_policy("admin", "data1", "read")
+        self.assertEqual(w.notify_message, "called add policy")
+
+        e.remove_policy("admin", "data1", "read")
+        self.assertEqual(w.notify_message, "called remove policy")
+
+        e.remove_filtered_policy(1, "data1")
+        self.assertEqual(w.notify_message, "called remove filtered policy")
+
+        rules = [
+            ["jack", "data4", "read"],
+            ["katy", "data4", "write"],
+        ]
+        e.add_policies(rules)
+        self.assertEqual(w.notify_message, "called add policies")
+
+        e.remove_policies(rules)
+        self.assertEqual(w.notify_message, "called remove policies")
+
 
 class AsyncMinimalWatcher:
     """A minimal async watcher that only implements async update() method."""
@@ -383,6 +412,37 @@ class TestAsyncWatcherEx(IsolatedAsyncioTestCase):
 
         await e.remove_policies(rules)
         self.assertEqual(w.notify_message, None)
+
+    async def test_auto_notify_with_auto_save_disabled(self):
+        e = self.get_enforcer(
+            get_examples("basic_model.conf"),
+            get_examples_copy("basic_policy.csv"),
+        )
+        await e.load_policy()
+
+        w = AsyncSampleWatcher()
+        e.set_watcher(w)
+        e.enable_auto_save(False)
+        e.enable_auto_notify_watcher(True)
+
+        await e.add_policy("admin", "data1", "read")
+        self.assertEqual(w.notify_message, "called add policy")
+
+        await e.remove_policy("admin", "data1", "read")
+        self.assertEqual(w.notify_message, "called remove policy")
+
+        await e.remove_filtered_policy(1, "data1")
+        self.assertEqual(w.notify_message, "called remove filtered policy")
+
+        rules = [
+            ["jack", "data4", "read"],
+            ["katy", "data4", "write"],
+        ]
+        await e.add_policies(rules)
+        self.assertEqual(w.notify_message, "called add policies")
+
+        await e.remove_policies(rules)
+        self.assertEqual(w.notify_message, "called remove policies")
 
     async def test_async_minimal_watcher(self):
         """Test that a watcher with only async update() method works properly."""

@@ -29,11 +29,11 @@ class InternalEnforcer(CoreEnforcer):
             if self.adapter.add_policy(sec, ptype, rule) is False:
                 return False
 
-            if self.watcher and self.auto_notify_watcher:
-                if callable(getattr(self.watcher, "update_for_add_policy", None)):
-                    self.watcher.update_for_add_policy(sec, ptype, rule)
-                else:
-                    self.watcher.update()
+        if self.watcher and self.auto_notify_watcher:
+            if callable(getattr(self.watcher, "update_for_add_policy", None)):
+                self.watcher.update_for_add_policy(sec, ptype, rule)
+            else:
+                self.watcher.update()
 
         rule_added = self.model.add_policy(sec, ptype, rule)
 
@@ -52,11 +52,11 @@ class InternalEnforcer(CoreEnforcer):
             if self.adapter.add_policies(sec, ptype, rules) is False:
                 return False
 
-            if self.watcher and self.auto_notify_watcher:
-                if callable(getattr(self.watcher, "update_for_add_policies", None)):
-                    self.watcher.update_for_add_policies(sec, ptype, rules)
-                else:
-                    self.watcher.update()
+        if self.watcher and self.auto_notify_watcher:
+            if callable(getattr(self.watcher, "update_for_add_policies", None)):
+                self.watcher.update_for_add_policies(sec, ptype, rules)
+            else:
+                self.watcher.update()
 
         rules_added = self.model.add_policies(sec, ptype, rules)
 
@@ -71,11 +71,11 @@ class InternalEnforcer(CoreEnforcer):
             if self.adapter.add_policies_ex(sec, ptype, rules) is False:
                 return False
 
-            if self.watcher and self.auto_notify_watcher:
-                if callable(getattr(self.watcher, "update_for_add_policies_ex", None)):
-                    self.watcher.update_for_add_policies_ex(sec, ptype, rules)
-                else:
-                    self.watcher.update()
+        if self.watcher and self.auto_notify_watcher:
+            if callable(getattr(self.watcher, "update_for_add_policies_ex", None)):
+                self.watcher.update_for_add_policies_ex(sec, ptype, rules)
+            else:
+                self.watcher.update()
 
         rules_added = self.model.add_policies_ex(sec, ptype, rules)
 
@@ -92,8 +92,8 @@ class InternalEnforcer(CoreEnforcer):
             if self.adapter.update_policy(sec, ptype, old_rule, new_rule) is False:
                 return False
 
-            if self.watcher and self.auto_notify_watcher:
-                self.watcher.update()
+        if self.watcher and self.auto_notify_watcher:
+            self.watcher.update()
 
         return rule_updated
 
@@ -108,8 +108,8 @@ class InternalEnforcer(CoreEnforcer):
             if self.adapter.update_policies(sec, ptype, old_rules, new_rules) is False:
                 return False
 
-            if self.watcher and self.auto_notify_watcher:
-                self.watcher.update()
+        if self.watcher and self.auto_notify_watcher:
+            self.watcher.update()
 
         return rules_updated
 
@@ -148,11 +148,11 @@ class InternalEnforcer(CoreEnforcer):
             if self.adapter.remove_policy(sec, ptype, rule) is False:
                 return False
 
-            if self.watcher and self.auto_notify_watcher:
-                if callable(getattr(self.watcher, "update_for_remove_policy", None)):
-                    self.watcher.update_for_remove_policy(sec, ptype, rule)
-                else:
-                    self.watcher.update()
+        if self.watcher and self.auto_notify_watcher:
+            if callable(getattr(self.watcher, "update_for_remove_policy", None)):
+                self.watcher.update_for_remove_policy(sec, ptype, rule)
+            else:
+                self.watcher.update()
 
         return rule_removed
 
@@ -169,11 +169,11 @@ class InternalEnforcer(CoreEnforcer):
             if self.adapter.remove_policies(sec, ptype, rules) is False:
                 return False
 
-            if self.watcher and self.auto_notify_watcher:
-                if callable(getattr(self.watcher, "update_for_remove_policies", None)):
-                    self.watcher.update_for_remove_policies(sec, ptype, rules)
-                else:
-                    self.watcher.update()
+        if self.watcher and self.auto_notify_watcher:
+            if callable(getattr(self.watcher, "update_for_remove_policies", None)):
+                self.watcher.update_for_remove_policies(sec, ptype, rules)
+            else:
+                self.watcher.update()
 
         return rules_removed
 
@@ -187,11 +187,11 @@ class InternalEnforcer(CoreEnforcer):
             if self.adapter.remove_filtered_policy(sec, ptype, field_index, *field_values) is False:
                 return False
 
-            if self.watcher and self.auto_notify_watcher:
-                if callable(getattr(self.watcher, "update_for_remove_filtered_policy", None)):
-                    self.watcher.update_for_remove_filtered_policy(sec, ptype, field_index, *field_values)
-                else:
-                    self.watcher.update()
+        if self.watcher and self.auto_notify_watcher:
+            if callable(getattr(self.watcher, "update_for_remove_filtered_policy", None)):
+                self.watcher.update_for_remove_filtered_policy(sec, ptype, field_index, *field_values)
+            else:
+                self.watcher.update()
 
         return rule_removed
 
@@ -205,8 +205,8 @@ class InternalEnforcer(CoreEnforcer):
             if self.adapter.remove_filtered_policy(sec, ptype, field_index, *field_values) is False:
                 return False
 
-            if self.watcher and self.auto_notify_watcher:
-                self.watcher.update()
+        if self.watcher and self.auto_notify_watcher:
+            self.watcher.update()
 
         return rule_removed
 
