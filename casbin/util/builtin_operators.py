@@ -14,6 +14,7 @@
 
 import ipaddress
 import re
+from functools import lru_cache
 from datetime import datetime
 import wcmatch.glob as glob
 
@@ -21,6 +22,72 @@ KEY_MATCH2_PATTERN = re.compile(r"(.*?):[^\/]+(.*?)")
 KEY_MATCH3_PATTERN = re.compile(r"(.*?){[^\/]+?}(.*?)")
 KEY_MATCH4_PATTERN = re.compile(r"{([^/]+)}")
 KEY_MATCH5_PATTERN = re.compile(r"{[^/]+}")
+
+
+WILDCARD_PATTERN = re.compile(r"\.\*|\[\^\\?/\]\+|\.|[^\\^$.|?*+()\[\]{}]")
+
+
+def _any_char(c):
+    return c != "\n"
+
+
+def _segment_char(c):
+    return c != "/"
+
+
+@lru_cache(maxsize=1024)
+def _parse_wildcards(pattern):
+    """splits a path pattern made of literals, ".", "[^/]+" and two or more ".*" into (char test, repeatable) steps,
+    returns None for any other pattern."""
+    if pattern.count(".*") < 2:
+        return None
+
+    steps = []
+    pos = 0
+    while pos < len(pattern):
+        m = WILDCARD_PATTERN.match(pattern, pos)
+        if not m:
+            return None
+        token = m.group()
+        if token == ".*":
+            steps.append((_any_char, True))
+        elif token == ".":
+            steps.append((_any_char, False))
+        elif len(token) > 1:
+            steps.append((_segment_char, False))
+            steps.append((_segment_char, True))
+        else:
+            steps.append((token.__eq__, False))
+        pos = m.end()
+    return tuple(steps)
+
+
+def _path_match(key1, pattern):
+    """determines whether the whole key1 matches the path pattern. A pattern with several ".*" is matched in
+    O(len(key1) * len(pattern)), because re.match() backtracks polynomially on it."""
+    steps = _parse_wildcards(pattern)
+    if steps is None:
+        return regex_match(key1, "^" + pattern + "$")
+
+    end = len(steps)
+
+    def add(states, i):
+        states.add(i)
+        while i < end and steps[i][1]:
+            i += 1
+            states.add(i)
+
+    states = set()
+    add(states, 0)
+    for c in key1:
+        next_states = set()
+        for i in states:
+            if i < end and steps[i][0](c):
+                add(next_states, i if steps[i][1] else i + 1)
+        if not next_states:
+            return False
+        states = next_states
+    return end in states
 
 
 def key_match(key1, key2):
@@ -72,7 +139,7 @@ def key_match2(key1, key2):
     if key2 == "*":
         key2 = "(.*)"
 
-    return regex_match(key1, "^" + key2 + "$")
+    return _path_match(key1, key2)
 
 
 def key_match2_func(*args):
@@ -114,7 +181,7 @@ def key_match3(key1, key2):
     key2 = key2.replace("/*", "/.*")
     key2 = KEY_MATCH3_PATTERN.sub(r"\g<1>[^\/]+\g<2>", key2, 0)
 
-    return regex_match(key1, "^" + key2 + "$")
+    return _path_match(key1, key2)
 
 
 def key_match3_func(*args):
@@ -213,7 +280,7 @@ def key_match5(key1: str, key2: str) -> bool:
 
     key2 = KEY_MATCH5_PATTERN.sub(r"[^/]+", key2, 0)
 
-    return regex_match(key1, "^" + key2 + "$")
+    return _path_match(key1, key2)
 
 
 def key_match5_func(*args) -> bool:

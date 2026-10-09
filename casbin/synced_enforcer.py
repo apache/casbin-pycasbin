@@ -215,7 +215,7 @@ class SyncedEnforcer:
     def get_adapter(self):
         """gets the current adapter."""
         with self._rl:
-            self._e.get_adapter()
+            return self._e.get_adapter()
 
     def set_adapter(self, adapter):
         """sets the current adapter."""
@@ -712,7 +712,7 @@ class SyncedEnforcer:
     def is_filtered(self):
         """returns true if the loaded policy has been filtered."""
         with self._rl:
-            self._e.is_filtered()
+            return self._e.is_filtered()
 
     def add_policies(self, rules):
         """adds authorization rules to the current policy.

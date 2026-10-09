@@ -74,6 +74,15 @@ class TestBuiltinOperators(TestCase):
 
         self.assertFalse(util.key_match2_func("/alice/all", "/:/all"))
 
+    def test_key_match2_multiple_wildcards(self):
+        self.assertTrue(util.key_match2_func("/api/a/b/c/detail", "/api/*/*/*/detail"))
+        self.assertTrue(util.key_match2_func("/api////detail", "/api/*/*/*/detail"))
+        self.assertTrue(util.key_match2_func("/api/a/b/c/d/1/detail", "/api/*/*/:id/detail"))
+        self.assertFalse(util.key_match2_func("/api/a/b/detail", "/api/*/*/*/detail"))
+        self.assertFalse(util.key_match2_func("/api/a/b/c/detail/x", "/api/*/*/*/detail"))
+        # used to take minutes because of regex backtracking
+        self.assertFalse(util.key_match2_func("/api/" + "/" * 5000, "/api/*/*/*/detail"))
+
     def test_key_get2(self):
         self.assertEqual(util.key_get2("/foo", "/foo", "id"), "")
         self.assertEqual(util.key_get2("/foo", "/foo*", "id"), "")
