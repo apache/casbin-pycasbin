@@ -16,25 +16,32 @@ from collections import OrderedDict
 import re
 
 eval_reg = re.compile(r"\beval\((?P<rule>[^)]*)\)")
+escape_assertion_reg = re.compile(r"\b([rp]\d*)\.")
 
 
 def escape_assertion(s):
-    """escapes the dots in the assertion, because the expression evaluation doesn't support such variable names."""
-    eval_p = re.search(r"\bp(\d*)\.", s)
-    if eval_p is not None:
-        p_suffix = eval_p.group(1)
-        p_before = re.compile(f"\\bp{p_suffix}\\.")
-        p_after = f"p{p_suffix}_"
-        s = re.sub(p_before, p_after, s)
-
-    eval_r = re.search(r"\br(\d*)\.", s)
-    if eval_r is not None:
-        r_suffix = eval_r.group(1)
-        r_before = re.compile(f"\\br{r_suffix}\\.")
-        r_after = f"r{r_suffix}_"
-        s = re.sub(r_before, r_after, s)
-
-    return s
+    """escapes the dots in the assertion, because the expression evaluation doesn't support such variable names.
+    Quoted string literals are kept as they are."""
+    res = []
+    start = 0
+    i = 0
+    while i < len(s):
+        quote = s[i]
+        if quote not in "\"'":
+            i += 1
+            continue
+        end = i + 1
+        while end < len(s) and s[end] != quote:
+            if s[end] == "\\":
+                end += 1
+            end += 1
+        end = min(end + 1, len(s))
+        res.append(escape_assertion_reg.sub(r"\1_", s[start:i]))
+        res.append(s[i:end])
+        start = end
+        i = end
+    res.append(escape_assertion_reg.sub(r"\1_", s[start:]))
+    return "".join(res)
 
 
 def remove_comments(s):

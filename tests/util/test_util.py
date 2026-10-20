@@ -29,6 +29,14 @@ class TestUtil(TestCase):
             util.escape_assertion("m = r.sub == p.sub && r.obj == p.obj && r.act == p.act"),
             "m = r_sub == p_sub && r_obj == p_obj && r_act == p_act",
         )
+        self.assertEqual(
+            util.escape_assertion('r.obj == "https://p.example.com" and p.sub == r.sub'),
+            'r_obj == "https://p.example.com" and p_sub == r_sub',
+        )
+        self.assertEqual(
+            util.escape_assertion("r.obj == 'a\\'p.b' or r2.obj == p2.obj"),
+            "r_obj == 'a\\'p.b' or r2_obj == p2_obj",
+        )
 
     def test_array_remove_duplicates(self):
         res = util.array_remove_duplicates(["data", "data1", "data2", "data1", "data2", "data3"])
