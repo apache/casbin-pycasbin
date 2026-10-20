@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import gc
 import os
 import time
 from typing import Sequence
@@ -49,13 +50,17 @@ class TestFastEnforcer(TestCaseBase):
         N = 5
         t_e1_list = []
         t_e2_list = []
-        for _ in range(N):
-            s_e1 = time.perf_counter()
-            e1.enforce("alice", "data1", "read")
-            t_e1_list.append(time.perf_counter() - s_e1)
-            s_e2 = time.perf_counter()
-            e2.enforce("alice", "data1", "read")
-            t_e2_list.append(time.perf_counter() - s_e2)
+        gc.disable()
+        try:
+            for _ in range(N):
+                s_e1 = time.perf_counter()
+                e1.enforce("alice", "data1", "read")
+                t_e1_list.append(time.perf_counter() - s_e1)
+                s_e2 = time.perf_counter()
+                e2.enforce("alice", "data1", "read")
+                t_e2_list.append(time.perf_counter() - s_e2)
+        finally:
+            gc.enable()
         avg_t_e1 = sum(t_e1_list) / N
         avg_t_e2 = sum(t_e2_list) / N
         assert avg_t_e1 > avg_t_e2 * 5

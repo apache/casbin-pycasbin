@@ -15,6 +15,7 @@
 import copy
 import logging
 import re
+from functools import lru_cache
 
 from casbin.effect import Effector, get_effector, effect_to_bool
 from casbin.model import Model, FunctionMap
@@ -436,8 +437,9 @@ class CoreEnforcer:
 
         exp_string = self.model["m"][mtype].value
         exp_has_eval = util.has_eval(exp_string)
-        if not exp_has_eval:
-            expression = self._get_expression(exp_string, functions)
+        expression = self._get_expression("" if exp_has_eval else exp_string, functions)
+        if exp_has_eval:
+            rule_names = util.get_eval_value(exp_string)
 
         policy_effects = set()
 
@@ -455,10 +457,8 @@ class CoreEnforcer:
                 parameters = dict(r_parameters, **p_parameters)
 
                 if exp_has_eval:
-                    rule_names = util.get_eval_value(exp_string)
-                    rules = [util.escape_assertion(p_parameters[rule_name]) for rule_name in rule_names]
-                    exp_with_rule = util.replace_eval(exp_string, rules)
-                    expression = self._get_expression(exp_with_rule, functions)
+                    rules = tuple(p_parameters[rule_name] for rule_name in rule_names)
+                    expression.set_expr(self._get_eval_expression(exp_string, rules))
 
                 result = expression.eval(parameters)
 
@@ -546,8 +546,17 @@ class CoreEnforcer:
 
     @staticmethod
     def _get_expression(expr, functions=None):
+        return SimpleEval(CoreEnforcer._normalize_expression(expr), functions)
+
+    @staticmethod
+    @lru_cache(maxsize=8192)
+    def _normalize_expression(expr):
         expr = expr.replace("&&", "and")
         expr = expr.replace("||", "or")
-        expr = re.sub(r"!(?!=)", "not ", expr)
+        return re.sub(r"!(?!=)", "not ", expr)
 
-        return SimpleEval(expr, functions)
+    @staticmethod
+    @lru_cache(maxsize=8192)
+    def _get_eval_expression(expr, rules):
+        rules = [util.escape_assertion(rule) for rule in rules]
+        return CoreEnforcer._normalize_expression(util.replace_eval(expr, rules))

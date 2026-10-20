@@ -420,6 +420,21 @@ class TestConfig(TestCaseBase):
         self.assertFalse(e.enforce(sub3, "/data1", "write"))
         self.assertFalse(e.enforce(sub3, "/data2", "write"))
 
+    def test_abac_with_updated_sub_rule(self):
+        e = self.get_enforcer(get_examples("abac_rule_model.conf"), get_examples("abac_rule_policy.csv"))
+        e.enable_auto_save(False)
+
+        sub = MockSub("alice", 16)
+        self.assertFalse(e.enforce(sub, "/data1", "read"))
+
+        e.remove_policy("r.sub.age > 18", "/data1", "read")
+        e.add_policy("r.sub.age > 10", "/data1", "read")
+        self.assertTrue(e.enforce(sub, "/data1", "read"))
+
+        e.remove_policy("r.sub.age > 10", "/data1", "read")
+        e.add_policy("r.sub.age > 18", "/data1", "read")
+        self.assertFalse(e.enforce(sub, "/data1", "read"))
+
     def test_abac_with_multiple_sub_rules(self):
         e = self.get_enforcer(
             get_examples("abac_multiple_rules_model.conf"),

@@ -12,8 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from functools import lru_cache
 from simpleeval import EvalWithCompoundTypes
 import ast
+
+
+@lru_cache(maxsize=8192)
+def parse_expression(expr):
+    return ast.parse(expr.strip()).body[0].value
 
 
 class SimpleEval(EvalWithCompoundTypes):
@@ -29,9 +35,13 @@ class SimpleEval(EvalWithCompoundTypes):
         """Create the evaluator instance.  Set up valid operators (+,-, etc)
         functions (add, random, get_val, whatever) and names."""
         super(SimpleEval, self).__init__(functions=functions)
+        self.set_expr(expr)
+
+    def set_expr(self, expr):
+        """replace the expression to evaluate, keeping the functions."""
         if expr != "":
             self.expr = expr
-            self.ast_parsed_value = ast.parse(expr.strip()).body[0].value
+            self.ast_parsed_value = parse_expression(expr)
 
     def eval(self, names=None):
         """evaluate an expression, using the operators, functions and
