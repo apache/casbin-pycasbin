@@ -13,7 +13,7 @@
 # limitations under the License.
 
 from functools import lru_cache
-from simpleeval import EvalWithCompoundTypes
+from simpleeval import EvalWithCompoundTypes, NameNotDefined
 import ast
 
 
@@ -51,3 +51,13 @@ class SimpleEval(EvalWithCompoundTypes):
             self.names = names
 
         return self._eval(self.ast_parsed_value)
+
+    def _eval_name(self, node):
+        try:
+            return super(SimpleEval, self)._eval_name(node)
+        except NameNotDefined:
+            if node.id == "true":
+                return True
+            if node.id == "false":
+                return False
+            raise

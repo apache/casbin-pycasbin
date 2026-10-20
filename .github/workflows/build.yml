@@ -18,6 +18,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Checkout conformance cases
+        uses: actions/checkout@v4
+        with:
+          repository: apache/casbin
+          path: casbin-conformance
+          sparse-checkout: conformance
+
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
         with:
@@ -31,6 +38,8 @@ jobs:
 
       - name: Run tests
         run: coverage run -m unittest discover -s tests -t tests
+        env:
+          CASBIN_CONFORMANCE_DIR: ${{ github.workspace }}/casbin-conformance/conformance
 
       - name: Run benchmark
         run: python3 -m pytest

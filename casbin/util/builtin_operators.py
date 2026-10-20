@@ -293,7 +293,7 @@ def key_match5_func(*args) -> bool:
 def regex_match(key1, key2):
     """determines whether key1 matches the pattern of key2 in regular expression."""
 
-    res = re.match(key2, key1)
+    res = re.search(key2, key1)
     if res:
         return True
     else:

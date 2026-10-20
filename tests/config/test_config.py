@@ -38,7 +38,7 @@ class TestConfig(TestCase):
         self.assertEqual(config.get("math::math.f64"), "64.1")
 
         # other::key test
-        self.assertEqual(config.get("other::name"), "ATC自动化测试^-^&($#……#")
+        self.assertEqual(config.get("other::name"), "ATC自动化测试^-^&($")
         self.assertEqual(config.get("other::key1"), "test key")
 
         config.set("other::key1", "new test key")

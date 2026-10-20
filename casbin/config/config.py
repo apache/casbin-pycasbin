@@ -93,7 +93,13 @@ class Config:
                 else:
                     p = line
                     can_write = True
-                buf.append(p)
+
+                end = len(p)
+                for i, value in enumerate(p):
+                    if value == self.DEFAULT_COMMENT or value == self.DEFAULT_COMMENT_SEM:
+                        end = i
+                        break
+                buf.append(p[:end])
 
     def _write(self, section, line_num, b):
         buf = "".join(b)

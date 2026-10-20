@@ -17,12 +17,12 @@ import logging
 import re
 from functools import lru_cache
 
-from casbin.effect import Effector, get_effector, effect_to_bool
+from casbin.effect import Effector, AllowAndDenyEffector, get_effector, effect_to_bool
 from casbin.model import Model, FunctionMap
 from casbin.persist import Adapter
 from casbin.persist.adapters import FileAdapter
 from casbin.rbac import default_role_manager
-from casbin.util import generate_g_function, SimpleEval, util, generate_conditional_g_function
+from casbin.util import generate_g_function, SimpleEval, util, generate_conditional_g_function, key_match
 from casbin.util.log import configure_logging, disabled_logging
 
 
@@ -220,6 +220,28 @@ class CoreEnforcer:
                     else:
                         assertion.cond_rm = default_role_manager.ConditionalDomainManager(10)
                         self.cond_rm_map[ptype] = assertion.cond_rm
+                    self._register_domain_matching_func(ptype)
+
+    def _get_domain_tokens(self):
+        r_domain_token = ""
+        p_domain_token = ""
+        r_assertion = (self.model["r"] or {}).get("r")
+        if r_assertion is not None and len(r_assertion.tokens) > 1:
+            r_domain_token = r_assertion.tokens[1]
+        p_assertion = (self.model["p"] or {}).get("p")
+        if p_assertion is not None and len(p_assertion.tokens) > 1:
+            p_domain_token = p_assertion.tokens[1]
+        return r_domain_token, p_domain_token
+
+    def _register_domain_matching_func(self, ptype):
+        r_domain_token, p_domain_token = self._get_domain_tokens()
+        m_assertion = (self.model["m"] or {}).get("m")
+        if r_domain_token == "" or p_domain_token == "" or m_assertion is None:
+            return
+
+        match_fun = "keyMatch({}, {})".format(r_domain_token, p_domain_token)
+        if match_fun in m_assertion.value:
+            self.add_named_domain_matching_func(ptype, key_match)
 
     def load_policy(self):
         """reloads the policy from file/database."""
@@ -339,6 +361,9 @@ class CoreEnforcer:
         if ptype in self.rm_map.keys():
             self.rm_map[ptype].add_domain_matching_func(fn)
             return True
+        if ptype in self.cond_rm_map.keys():
+            self.cond_rm_map[ptype].add_domain_matching_func(fn)
+            return True
 
         return False
 
@@ -411,7 +436,7 @@ class CoreEnforcer:
             for key, ast in self.model["g"].items():
                 if len(self.rm_map) != 0:
                     functions[key] = generate_g_function(ast.rm)
-                if len(self.cond_rm_map) != 0:
+                if ast.cond_rm is not None:
                     functions[key] = generate_conditional_g_function(ast.cond_rm)
 
         if len(rvals) != 0:
@@ -448,6 +473,7 @@ class CoreEnforcer:
         policy_len = len(self.model["p"][ptype].policy)
 
         explain_index = -1
+        allow_index = -1
         if not 0 == policy_len:
             for i, pvals in enumerate(self.model["p"][ptype].policy):
                 if len(p_tokens) != len(pvals):
@@ -485,11 +511,11 @@ class CoreEnforcer:
                 else:
                     policy_effects.add(Effector.ALLOW)
 
-                # Update explain_index for any matching policy before checking early break condition
-                # to ensure explanations are captured for allow rules in deny models
-                explain_index = i
+                if allow_index == -1 and Effector.ALLOW in policy_effects:
+                    allow_index = i
 
                 if self.eft.intermediate_effect(policy_effects) != Effector.INDETERMINATE:
+                    explain_index = i
                     break
 
         else:
@@ -510,6 +536,8 @@ class CoreEnforcer:
 
         final_effect = self.eft.final_effect(policy_effects)
         result = effect_to_bool(final_effect)
+        if explain_index == -1 and final_effect == Effector.ALLOW and isinstance(self.eft, AllowAndDenyEffector):
+            explain_index = allow_index
 
         # Log request.
         if (result and self.logger.isEnabledFor(logging.INFO)) or (
