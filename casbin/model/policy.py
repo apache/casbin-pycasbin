@@ -87,6 +87,7 @@ class Policy:
 
             for key in self[sec].keys():
                 self[sec][key].policy = []
+                self[sec][key].policy_version += 1
 
     def get_policy(self, sec, ptype):
         """gets all rules in a policy.
@@ -153,6 +154,7 @@ class Policy:
                 print(e)
 
         assertion.policy_map[DEFAULT_SEP.join(rule)] = len(assertion.policy) - 1
+        assertion.policy_version += 1
         return True
 
     def add_policies(self, sec, ptype, rules):
@@ -210,6 +212,8 @@ class Policy:
             assertion.policy.append(rule)
             assertion.policy_map[DEFAULT_SEP.join(rule)] = len(assertion.policy) - 1
             rules_added = True
+        if rules_added:
+            assertion.policy_version += 1
         return rules_added
 
     def update_policy(self, sec, ptype, old_rule, new_rule):
@@ -236,6 +240,7 @@ class Policy:
         else:
             ast.policy[rule_index] = new_rule
 
+        ast.policy_version += 1
         return True
 
     def update_policies(self, sec, ptype, old_rules, new_rules):
@@ -268,6 +273,7 @@ class Policy:
             for idx, old_rule, new_rule in zip(old_rules_index, old_rules, new_rules):
                 ast.policy[idx] = new_rule
 
+        ast.policy_version += 1
         return True
 
     def remove_policy(self, sec, ptype, rule):
@@ -276,6 +282,7 @@ class Policy:
             return False
 
         self[sec][ptype].policy.remove(rule)
+        self[sec][ptype].policy_version += 1
 
         return rule not in self[sec][ptype].policy
 
@@ -289,6 +296,7 @@ class Policy:
             if rule in self[sec][ptype].policy:
                 return False
 
+        self[sec][ptype].policy_version += 1
         return True
 
     def remove_policies_with_effected(self, sec, ptype, rules):
@@ -321,6 +329,8 @@ class Policy:
                 tmp.append(rule)
 
         self[sec][ptype].policy = tmp
+        if effects:
+            self[sec][ptype].policy_version += 1
 
         return effects
 
@@ -341,6 +351,8 @@ class Policy:
                 tmp.append(rule)
 
         self[sec][ptype].policy = tmp
+        if res:
+            self[sec][ptype].policy_version += 1
 
         return res
 

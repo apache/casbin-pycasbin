@@ -819,6 +819,21 @@ class SyncedEnforcer:
         assertion = self._e.model["p"][ptype]
         assertion.field_index_map[field] = index
 
+    def set_policy_index(self, ptype, index):
+        """partitions the policy rules of ptype with a PolicyIndex."""
+        with self._wl:
+            return self._e.set_policy_index(ptype, index)
+
+    def set_policy_index_by_token(self, ptype, request_token, policy_token):
+        """partitions ptype's rules by the string value of two tokens."""
+        with self._wl:
+            return self._e.set_policy_index_by_token(ptype, request_token, policy_token)
+
+    def remove_policy_index(self, ptype):
+        """removes the policy partition for ptype."""
+        with self._wl:
+            return self._e.remove_policy_index(ptype)
+
     def get_all_roles_by_domain(self, domain):
         """gets all roles associated with the domain.
         note: Not applicable to Domains with inheritance relationship  (implicit roles)"""

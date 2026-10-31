@@ -135,6 +135,7 @@ class Model(Policy):
 
             for i, policy in enumerate(assertion.policy):
                 assertion.policy_map[",".join(policy)] = i
+            assertion.policy_version += 1
 
         return None
 
@@ -162,6 +163,7 @@ class Model(Policy):
             assertion.policy = sorted(assertion.policy, key=compare_policy)
             for i, policy in enumerate(assertion.policy):
                 assertion.policy_map[",".join(policy)] = i
+            assertion.policy_version += 1
 
     def get_subject_hierarchy_map(self, policies):
         """

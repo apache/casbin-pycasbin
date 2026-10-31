@@ -26,6 +26,7 @@ class Assertion:
         self.tokens = []
         self.params_tokens = []
         self.policy = []
+        self.policy_version = 0
         self.rm = None
         self.cond_rm = None
         self.priority_index: int = -1

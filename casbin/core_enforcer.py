@@ -17,10 +17,16 @@ import logging
 import re
 from functools import lru_cache
 
-from casbin.effect import Effector, AllowAndDenyEffector, get_effector, effect_to_bool
+from casbin.effect import (
+    AllowAndDenyEffector,
+    Effector,
+    effect_to_bool,
+    get_effector,
+)
 from casbin.model import Model, FunctionMap
 from casbin.persist import Adapter
 from casbin.persist.adapters import FileAdapter
+from casbin.policy_index import PolicyIndex, policy_matches_bucket
 from casbin.rbac import default_role_manager
 from casbin.util import generate_g_function, SimpleEval, util, generate_conditional_g_function, key_match
 from casbin.util.log import configure_logging, disabled_logging
@@ -62,6 +68,8 @@ class CoreEnforcer:
 
     def __init__(self, model=None, adapter=None, enable_log=False, logging_config: dict = None):
         self.logger = logging.getLogger("casbin.enforcer")
+        self._policy_indexes = {}
+        self._policy_deny_cache = {}
         if isinstance(model, str):
             if isinstance(adapter, str):
                 self.init_with_file(model, adapter)
@@ -120,6 +128,7 @@ class CoreEnforcer:
         self.auto_build_role_links = True
         self.auto_notify_watcher = True
 
+        self._reset_policy_caches()
         self.init_rm_map()
 
     @staticmethod
@@ -143,6 +152,7 @@ class CoreEnforcer:
         self.model.load_model(self.model_path)
         self.model.print_model()
         self.fm = FunctionMap.load_function_map()
+        self._reset_policy_caches()
 
     def get_model(self):
         """gets the current model."""
@@ -154,6 +164,7 @@ class CoreEnforcer:
 
         self.model = m
         self.fm = FunctionMap.load_function_map()
+        self._reset_policy_caches()
 
     def get_adapter(self):
         """gets the current adapter."""
@@ -190,6 +201,82 @@ class CoreEnforcer:
     def set_effector(self, eft):
         """sets the current effector."""
         self.eft = eft
+
+    def set_policy_index(self, ptype, index):
+        """partitions the policy rules of ptype with a PolicyIndex."""
+        if not isinstance(index, PolicyIndex):
+            raise TypeError("index must be a PolicyIndex")
+        if "p" not in self.model.keys() or ptype not in self.model["p"]:
+            raise ValueError(f"policy type {ptype!r} does not exist")
+        self._policy_indexes[ptype] = index
+
+    def set_policy_index_by_token(self, ptype, request_token, policy_token):
+        """partitions ptype's rules by the string value of two tokens.
+
+        It uses the default request type "r"; use set_policy_index with a
+        custom function when enforcing through an EnforceContext.
+        """
+        if "r" not in self.model.keys() or "r" not in self.model["r"]:
+            raise ValueError('request type "r" does not exist')
+        request_tokens = self.model["r"]["r"].tokens
+        if request_token not in request_tokens:
+            raise ValueError(f"request token {request_token!r} does not exist")
+        request_index = request_tokens.index(request_token)
+
+        if "p" not in self.model.keys() or ptype not in self.model["p"]:
+            raise ValueError(f"policy type {ptype!r} does not exist")
+        policy_tokens = self.model["p"][ptype].tokens
+        if policy_token not in policy_tokens:
+            raise ValueError(f"policy token {policy_token!r} does not exist")
+        policy_index = policy_tokens.index(policy_token)
+
+        def request_key(rvals, index=request_index):
+            if index >= len(rvals):
+                return "", False
+            value = rvals[index]
+            if isinstance(value, str):
+                return value, True
+            return "", False
+
+        def policy_key(rule, index=policy_index):
+            if index >= len(rule):
+                return ""
+            return rule[index]
+
+        self.set_policy_index(ptype, PolicyIndex(request_key, policy_key))
+
+    def remove_policy_index(self, ptype):
+        """removes the policy partition for ptype."""
+        self._policy_indexes.pop(ptype, None)
+
+    def _reset_policy_caches(self):
+        for index in self._policy_indexes.values():
+            index.reset()
+        self._policy_deny_cache.clear()
+
+    def _policy_has_deny(self, ptype, p_tokens):
+        assertion = self.model["p"][ptype]
+        cached = self._policy_deny_cache.get(ptype)
+        if cached is not None and cached[0] == assertion.policy_version and cached[1] == len(assertion.policy):
+            return cached[2], cached[3]
+
+        eft_token = ptype + "_eft"
+        eft_index = p_tokens.index(eft_token) if eft_token in p_tokens else -1
+        has_deny = False
+        all_valid = True
+        for rule in assertion.policy:
+            if len(rule) != len(p_tokens):
+                all_valid = False
+            if eft_index != -1 and eft_index < len(rule) and rule[eft_index] == "deny":
+                has_deny = True
+
+        self._policy_deny_cache[ptype] = (
+            assertion.policy_version,
+            len(assertion.policy),
+            has_deny,
+            all_valid,
+        )
+        return has_deny, all_valid
 
     def clear_policy(self):
         """clears all policy."""
@@ -271,6 +358,7 @@ class CoreEnforcer:
                     new_model.build_conditional_role_links(self.cond_rm_map)
 
             self.model = new_model
+            self._reset_policy_caches()
 
         except Exception as e:
             if self.auto_build_role_links and need_to_rebuild:
@@ -472,12 +560,28 @@ class CoreEnforcer:
 
         policy_len = len(self.model["p"][ptype].policy)
 
+        policy_index = self._policy_indexes.get(ptype)
+        bucket_ids = None
+        request_bucket = 0
+        use_policy_index = False
+        if policy_index is not None:
+            bucket_ids = policy_index.ensure_built(self.model["p"][ptype])
+            request_bucket, use_policy_index = policy_index.request_bucket(rvals)
+
+        shortcut_allow_and_deny = False
+        if policy_len != 0 and type(self.eft) is AllowAndDenyEffector:
+            has_deny, all_valid = self._policy_has_deny(ptype, p_tokens)
+            shortcut_allow_and_deny = all_valid and not has_deny
+
         explain_index = -1
         allow_index = -1
         if not 0 == policy_len:
             for i, pvals in enumerate(self.model["p"][ptype].policy):
                 if len(p_tokens) != len(pvals):
                     raise RuntimeError("invalid policy size")
+
+                if use_policy_index and not policy_matches_bucket(bucket_ids, i, request_bucket):
+                    continue
 
                 p_parameters = dict(zip(p_tokens, pvals))
                 parameters = dict(r_parameters, **p_parameters)
@@ -513,6 +617,10 @@ class CoreEnforcer:
 
                 if allow_index == -1 and Effector.ALLOW in policy_effects:
                     allow_index = i
+
+                if shortcut_allow_and_deny and Effector.ALLOW in policy_effects:
+                    explain_index = i
+                    break
 
                 if self.eft.intermediate_effect(policy_effects) != Effector.INDETERMINATE:
                     explain_index = i
