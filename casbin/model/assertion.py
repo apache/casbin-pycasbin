@@ -46,7 +46,7 @@ class Assertion:
 
             self.rm.add_link(*rule[:count])
 
-        self.logger.info("Role links for: {}".format(self.key))
+        self.logger.debug(f"Role links for: {self.key}")
         self.rm.print_roles()
 
     def build_incremental_role_links(self, rm, op, rules):

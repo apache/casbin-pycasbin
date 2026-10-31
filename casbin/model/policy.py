@@ -68,15 +68,15 @@ class Policy:
                 ast.build_conditional_role_links(cond_rm)
 
     def print_policy(self):
-        """Log using info"""
+        """Logs the policy at debug level."""
 
-        self.logger.info("Policy:")
+        self.logger.debug("Policy:")
         for sec in ["p", "g"]:
             if sec not in self.keys():
                 continue
 
             for key, ast in self[sec].items():
-                self.logger.info("{} : {} : {}".format(key, ast.value, ast.policy))
+                self.logger.debug(f"{key} : {ast.value} : {ast.policy}")
 
     def clear_policy(self):
         """clears all current policy."""
@@ -156,15 +156,24 @@ class Policy:
         return True
 
     def add_policies(self, sec, ptype, rules):
-        """adds policy rules to the model."""
+        """adds policy rules to the model in one pass.
+
+        Adapters loading many rules should use this instead of calling add_policy in a loop.
+        """
+        assertion = self[sec][ptype]
+        rules = list(rules)
+        policy_keys = {tuple(rule) for rule in assertion.policy}
 
         for rule in rules:
-            if self.has_policy(sec, ptype, rule):
+            if tuple(rule) in policy_keys:
                 return False
 
-        for rule in rules:
-            self.add_policy(sec, ptype, rule)
+        if sec == "p" and assertion.priority_index >= 0:
+            for rule in rules:
+                self.add_policy(sec, ptype, rule)
+            return True
 
+        self._append_policies(assertion, rules, policy_keys)
         return True
 
     def add_policies_ex(self, sec, ptype, rules):
@@ -173,11 +182,33 @@ class Policy:
         If the rule already exists, the rule will not be added.
         But unlike add_policies, other non-existent rules are added instead of returning false directly.
         """
+        assertion = self[sec][ptype]
+        rules = list(rules)
+        policy_keys = {tuple(rule) for rule in assertion.policy}
+
+        if sec == "p" and assertion.priority_index >= 0:
+            rules_added = False
+            for rule in rules:
+                key = tuple(rule)
+                if key in policy_keys:
+                    continue
+                self.add_policy(sec, ptype, rule)
+                policy_keys.add(key)
+                rules_added = True
+            return rules_added
+
+        return self._append_policies(assertion, rules, policy_keys)
+
+    @staticmethod
+    def _append_policies(assertion, rules, policy_keys):
         rules_added = False
         for rule in rules:
-            if self.has_policy(sec, ptype, rule):
+            key = tuple(rule)
+            if key in policy_keys:
                 continue
-            self.add_policy(sec, ptype, rule)
+            policy_keys.add(key)
+            assertion.policy.append(rule)
+            assertion.policy_map[DEFAULT_SEP.join(rule)] = len(assertion.policy) - 1
             rules_added = True
         return rules_added
 

@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import logging
-from collections import namedtuple
+from collections import OrderedDict, namedtuple
 from enum import Enum
 
 from casbin.rbac import RoleManager as RM
@@ -216,7 +216,7 @@ class RoleManager(RM):
         return ", ".join(line)
 
     def print_roles(self):
-        self.logger.info(self.to_string())
+        self.logger.debug(self.to_string())
 
 
 class DomainManagerBase(RM):
@@ -297,19 +297,34 @@ class DomainManagerBase(RM):
 
 
 class DomainManager(DomainManagerBase):
-    def __init__(self, max_hierarchy_level=10):
+    def __init__(self, max_hierarchy_level=10, max_cached_role_managers=1000):
+        """Caches one role manager per domain.
+
+        max_cached_role_managers limits the cache; the least recently used role
+        manager is evicted when the limit is exceeded. Pass 0 or None for no limit.
+        ConditionalDomainManager does not use this limit because its link
+        conditions live in the role managers.
+        """
         super().__init__(max_hierarchy_level)
-        self.rm_map = dict()  # type: dict[str, RoleManager]
+        self.max_cached_role_managers = max_cached_role_managers
+        self.rm_map = OrderedDict()  # type: OrderedDict[str, RoleManager]
 
     def _rebuild(self):
-        self.rm_map = dict()
+        self.rm_map = OrderedDict()
 
     def _get_role_manager(self, *domain):
         domain1 = self._get_domain(*domain)
-        if domain1 not in self.rm_map:
-            self.rm_map[domain1] = super()._get_role_manager(*domain)
+        rm = self.rm_map.get(domain1)
+        if rm is None:
+            rm = super()._get_role_manager(*domain)
+            self.rm_map[domain1] = rm
+            if self.max_cached_role_managers and self.max_cached_role_managers > 0:
+                while len(self.rm_map) > self.max_cached_role_managers:
+                    self.rm_map.popitem(last=False)
+        else:
+            self.rm_map.move_to_end(domain1)
 
-        return self.rm_map[domain1]
+        return rm
 
     def _affected_role_managers(self, *domain):
         domain_pattern = self._get_domain(*domain)
@@ -336,7 +351,7 @@ class DomainManager(DomainManagerBase):
 
     def clear(self):
         super().clear()
-        self.rm_map = dict()
+        self.rm_map = OrderedDict()
 
     def add_link(self, name1, name2, *domain):
         super().add_link(name1, name2, *domain)
@@ -360,7 +375,7 @@ class DomainManager(DomainManagerBase):
     def print_roles(self):
         for domain, rm in self.rm_map.items():
             line = rm.to_string()
-            self.logger.info(f"{domain}: {line}")
+            self.logger.debug(f"{domain}: {line}")
 
 
 def match_error_handler(fn, key1, key2):

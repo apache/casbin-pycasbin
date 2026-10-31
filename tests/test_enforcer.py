@@ -14,6 +14,7 @@
 
 import atexit
 import copy
+import logging
 import os
 import shutil
 import tempfile
@@ -1139,3 +1140,31 @@ class TestModelDeepCopy(TestCase):
         # the role manager must still be usable even though nothing rebuilt the links
         self.assertIsNotNone(e.model.model["g"]["g"].rm)
         self.assertTrue(e.enforce("alice", "data2", "read"))
+
+
+class TestLogging(TestCaseBase):
+    def test_load_policy_logs_rules_at_debug(self):
+        e = self.get_enforcer(
+            get_examples("rbac_model.conf"),
+            get_examples("rbac_policy.csv"),
+        )
+        policy_logger = logging.getLogger("casbin.policy")
+        role_logger = logging.getLogger("casbin.role")
+        policy_disabled = policy_logger.disabled
+        role_disabled = role_logger.disabled
+        policy_logger.disabled = False
+        role_logger.disabled = False
+
+        try:
+            with self.assertLogs("casbin.policy", level="DEBUG") as captured:
+                e.load_policy()
+            self.assertFalse(any(record.levelno >= logging.INFO for record in captured.records))
+            self.assertTrue(any("alice" in record.getMessage() for record in captured.records))
+
+            with self.assertLogs("casbin.role", level="DEBUG") as captured:
+                e.load_policy()
+            self.assertFalse(any(record.levelno >= logging.INFO for record in captured.records))
+            self.assertTrue(any("alice" in record.getMessage() for record in captured.records))
+        finally:
+            policy_logger.disabled = policy_disabled
+            role_logger.disabled = role_disabled

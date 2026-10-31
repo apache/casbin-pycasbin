@@ -173,6 +173,126 @@ class TestPolicy(TestCase):
         for new_rule in new_rules:
             self.assertTrue(m.has_policy("p", "p", new_rule))
 
+    def test_add_policies_bulk(self):
+        m = Model()
+        m.load_model(get_examples("basic_model.conf"))
+
+        rules = [[f"user{i}", f"data{i}", "read"] for i in range(1000)]
+        self.assertTrue(m.add_policies("p", "p", rules))
+        self.assertEqual(m.get_policy("p", "p"), rules)
+        self.assertEqual(m["p"]["p"].policy_map["user999,data999,read"], 999)
+
+        self.assertFalse(
+            m.add_policies(
+                "p", "p", [["new", "data", "read"], ["user0", "data0", "read"]]
+            )
+        )
+        self.assertEqual(len(m.get_policy("p", "p")), 1000)
+        self.assertFalse(m.has_policy("p", "p", ["new", "data", "read"]))
+
+        self.assertTrue(
+            m.add_policies("p", "p", [["dup", "data", "read"], ["dup", "data", "read"]])
+        )
+        self.assertEqual(len(m.get_policy("p", "p")), 1001)
+        self.assertTrue(m.has_policy("p", "p", ["dup", "data", "read"]))
+
+    def test_add_policies_accepts_iterators(self):
+        m = Model()
+        m.load_model(get_examples("basic_model.conf"))
+
+        rules = ([f"user{i}", f"data{i}", "read"] for i in range(3))
+        self.assertTrue(m.add_policies("p", "p", rules))
+        self.assertEqual(
+            m.get_policy("p", "p"),
+            [
+                ["user0", "data0", "read"],
+                ["user1", "data1", "read"],
+                ["user2", "data2", "read"],
+            ],
+        )
+
+    def test_add_policies_ex_bulk(self):
+        m = Model()
+        m.load_model(get_examples("basic_model.conf"))
+
+        m.add_policy("p", "p", ["user0", "data0", "read"])
+        rules = [
+            ["user0", "data0", "read"],
+            ["user1", "data1", "read"],
+            ["user1", "data1", "read"],
+            ["user2", "data2", "read"],
+        ]
+        self.assertTrue(m.add_policies_ex("p", "p", rules))
+        self.assertEqual(
+            m.get_policy("p", "p"),
+            [
+                ["user0", "data0", "read"],
+                ["user1", "data1", "read"],
+                ["user2", "data2", "read"],
+            ],
+        )
+
+        self.assertFalse(m.add_policies_ex("p", "p", [["user0", "data0", "read"]]))
+
+    def test_add_policies_distinguishes_comma_in_rule(self):
+        m = Model()
+        m.load_model(get_examples("basic_model.conf"))
+
+        m.add_policy("p", "p", ["a,b", "read"])
+        self.assertTrue(m.add_policies_ex("p", "p", [["a", "b", "read"]]))
+        self.assertEqual(
+            m.get_policy("p", "p"),
+            [["a,b", "read"], ["a", "b", "read"]],
+        )
+
+    def test_add_policies_priority(self):
+        rules = [
+            ["2", "admin", "data2", "read", "allow"],
+            ["1", "admin", "data1", "read", "allow"],
+            ["3", "admin", "data3", "read", "allow"],
+        ]
+
+        sequential = Model()
+        sequential.load_model(get_examples("priority_model_explicit.conf"))
+        sequential.sort_policies_by_priority()
+        for rule in rules:
+            sequential.add_policy("p", "p", rule)
+
+        bulk = Model()
+        bulk.load_model(get_examples("priority_model_explicit.conf"))
+        bulk.sort_policies_by_priority()
+        self.assertTrue(bulk.add_policies("p", "p", rules))
+
+        self.assertEqual(bulk.get_policy("p", "p"), sequential.get_policy("p", "p"))
+        self.assertEqual(
+            bulk.get_policy("p", "p"),
+            [
+                ["1", "admin", "data1", "read", "allow"],
+                ["2", "admin", "data2", "read", "allow"],
+                ["3", "admin", "data3", "read", "allow"],
+            ],
+        )
+
+        self.assertTrue(
+            bulk.add_policies_ex(
+                "p",
+                "p",
+                [
+                    ["2", "admin", "data2", "read", "allow"],
+                    ["0", "admin", "data0", "read", "allow"],
+                ],
+            )
+        )
+        self.assertEqual(
+            bulk.get_policy("p", "p"),
+            [
+                ["0", "admin", "data0", "read", "allow"],
+                ["1", "admin", "data1", "read", "allow"],
+                ["2", "admin", "data2", "read", "allow"],
+                ["3", "admin", "data3", "read", "allow"],
+            ],
+        )
+
     def test_remove_policy(self):
         m = Model()
         m.load_model(get_examples("basic_model.conf"))

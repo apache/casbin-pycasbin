@@ -266,6 +266,35 @@ class TestDomainManager(TestRoleManager):
     def get_role_manager(self):
         return default_role_manager.DomainManager(max_hierarchy_level=10)
 
+    def test_domain_role_manager_cache_limit(self):
+        rm = default_role_manager.DomainManager(
+            max_hierarchy_level=10, max_cached_role_managers=2
+        )
+        rm.add_link("u1", "g1", "domain1")
+        rm.add_link("u2", "g2", "domain2")
+        rm.add_link("u3", "g3", "domain3")
+
+        self.assertTrue(rm.has_link("u1", "g1", "domain1"))
+        self.assertTrue(rm.has_link("u2", "g2", "domain2"))
+        self.assertTrue(rm.has_link("u3", "g3", "domain3"))
+        self.assertEqual(len(rm.rm_map), 2)
+        self.assertEqual(list(rm.rm_map.keys()), ["domain2", "domain3"])
+
+        self.assertTrue(rm.has_link("u1", "g1", "domain1"))
+        self.assertEqual(len(rm.rm_map), 2)
+        self.assertEqual(list(rm.rm_map.keys()), ["domain3", "domain1"])
+
+    def test_domain_role_manager_cache_unbounded(self):
+        rm = default_role_manager.DomainManager(
+            max_hierarchy_level=10, max_cached_role_managers=0
+        )
+        for i in range(5):
+            rm.add_link(f"u{i}", f"g{i}", f"domain{i}")
+
+        for i in range(5):
+            self.assertTrue(rm.has_link(f"u{i}", f"g{i}", f"domain{i}"))
+        self.assertEqual(len(rm.rm_map), 5)
+
     def test_domain_role(self):
         rm = self.get_role_manager()
         rm.add_link("u1", "g1", "domain1")
