@@ -1,7 +1,6 @@
 import logging
 import logging.config
 
-
 # Default logging for Casbin.
 DEFAULT_LOGGING = {
     "version": 1,

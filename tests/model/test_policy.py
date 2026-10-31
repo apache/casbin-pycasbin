@@ -182,17 +182,11 @@ class TestPolicy(TestCase):
         self.assertEqual(m.get_policy("p", "p"), rules)
         self.assertEqual(m["p"]["p"].policy_map["user999,data999,read"], 999)
 
-        self.assertFalse(
-            m.add_policies(
-                "p", "p", [["new", "data", "read"], ["user0", "data0", "read"]]
-            )
-        )
+        self.assertFalse(m.add_policies("p", "p", [["new", "data", "read"], ["user0", "data0", "read"]]))
         self.assertEqual(len(m.get_policy("p", "p")), 1000)
         self.assertFalse(m.has_policy("p", "p", ["new", "data", "read"]))
 
-        self.assertTrue(
-            m.add_policies("p", "p", [["dup", "data", "read"], ["dup", "data", "read"]])
-        )
+        self.assertTrue(m.add_policies("p", "p", [["dup", "data", "read"], ["dup", "data", "read"]]))
         self.assertEqual(len(m.get_policy("p", "p")), 1001)
         self.assertTrue(m.has_policy("p", "p", ["dup", "data", "read"]))
 

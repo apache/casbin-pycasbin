@@ -267,9 +267,7 @@ class TestDomainManager(TestRoleManager):
         return default_role_manager.DomainManager(max_hierarchy_level=10)
 
     def test_domain_role_manager_cache_limit(self):
-        rm = default_role_manager.DomainManager(
-            max_hierarchy_level=10, max_cached_role_managers=2
-        )
+        rm = default_role_manager.DomainManager(max_hierarchy_level=10, max_cached_role_managers=2)
         rm.add_link("u1", "g1", "domain1")
         rm.add_link("u2", "g2", "domain2")
         rm.add_link("u3", "g3", "domain3")
@@ -285,9 +283,7 @@ class TestDomainManager(TestRoleManager):
         self.assertEqual(list(rm.rm_map.keys()), ["domain3", "domain1"])
 
     def test_domain_role_manager_cache_unbounded(self):
-        rm = default_role_manager.DomainManager(
-            max_hierarchy_level=10, max_cached_role_managers=0
-        )
+        rm = default_role_manager.DomainManager(max_hierarchy_level=10, max_cached_role_managers=0)
         for i in range(5):
             rm.add_link(f"u{i}", f"g{i}", f"domain{i}")
 
