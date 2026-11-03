@@ -1,12 +1,39 @@
-PyCasbin
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  https://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+
+Apache Casbin (Incubating) — PyCasbin
 ====
+
+Apache Casbin (Incubating) is an effort undergoing incubation at the Apache Software Foundation (ASF), sponsored by the Apache Incubator PMC.
+
+Incubation is required of all newly accepted projects until a further review indicates that the infrastructure, communications, and decision making process have stabilized in a manner consistent with other successful ASF projects.
+
+While incubation status is not necessarily a reflection of the completeness or stability of the code, it does indicate that the project has yet to be fully endorsed by the ASF.
+
+Python 3.9 or newer is required. See [RELEASING.md](RELEASING.md) for source verification, local tests and the Apache release process. Versions through 2.8.0 predate Apache incubation.
 
 [![build](https://github.com/apache/casbin-pycasbin/actions/workflows/build.yml/badge.svg)](https://github.com/apache/casbin-pycasbin/actions/workflows/build.yml)
 [![Coverage Status](https://coveralls.io/repos/github/apache/casbin-pycasbin/badge.svg)](https://coveralls.io/github/apache/casbin-pycasbin)
-[![Version](https://img.shields.io/pypi/v/pycasbin.svg)](https://pypi.org/project/pycasbin/)
-[![PyPI - Wheel](https://img.shields.io/pypi/wheel/pycasbin.svg)](https://pypi.org/project/pycasbin/)
-[![Pyversions](https://img.shields.io/pypi/pyversions/pycasbin.svg)](https://pypi.org/project/pycasbin/)
-[![Download](https://static.pepy.tech/badge/pycasbin)](https://pypi.org/project/pycasbin/)
+[![Version](https://img.shields.io/pypi/v/apache-casbin.svg)](https://pypi.org/project/apache-casbin/)
+[![PyPI - Wheel](https://img.shields.io/pypi/wheel/apache-casbin.svg)](https://pypi.org/project/apache-casbin/)
+[![Pyversions](https://img.shields.io/pypi/pyversions/apache-casbin.svg)](https://pypi.org/project/apache-casbin/)
+[![Download](https://static.pepy.tech/badge/apache-casbin)](https://pypi.org/project/apache-casbin/)
 [![Discord](https://img.shields.io/discord/1022748306096537660?logo=discord&label=discord&color=5865F2)](https://discord.gg/S5UjpzGZjN)
 
 **News**: 🔥 How to use it with `Django` ? Try [Django Authorization](https://github.com/officialpycasbin/django-authorization), an authorization library for `Django` framework.
@@ -136,11 +163,51 @@ What Casbin does NOT do:
 1. authentication (aka verify ``username`` and ``password`` when a user logs in)
 2. manage the list of users or roles. I believe it's more convenient for the project itself to manage these entities. Users usually have their passwords, and Casbin is not designed as a password container. However, Casbin stores the user-role mapping for the RBAC scenario. 
 
+## Cached enforcers
+
+`CachedEnforcer`, `SyncedCachedEnforcer` and `AsyncCachedEnforcer` expose the
+corresponding enforcer API with cached authorization decisions. For example:
+
+```python
+import casbin
+
+e = casbin.CachedEnforcer("model.conf", "policy.csv")
+allowed = e.enforce("alice", "data1", "read")
+```
+
+Changes through the enforcer's policy-management API invalidate its cache.
+Changes to external data or directly to a model/role manager require
+`invalidate_cache()` or an application-appropriate `set_expire_time(seconds)`.
+Conditional-role models bypass caching by default; setting a positive, finite
+expiry opts into a bounded staleness window. Zero, negative and non-finite
+expiries keep that bypass in effect. Async policy-management methods must be awaited,
+while `enforce()` stays synchronous.
+
+Models, policies and regular-expression patterns are trusted configuration.
+`regexMatch` uses Python's regular-expression engine and does not guarantee a
+match timeout. `ipMatch` raises `ValueError` for a malformed request address;
+applications should validate addresses or treat that error as a denied request.
+
 ## Installation
 
 ```
-pip install pycasbin
+python -m pip install apache-casbin
 ```
+
+The Python import stays `import casbin`. When migrating an existing environment,
+remove both legacy distributions before installing the Apache distribution:
+
+```sh
+python -m pip uninstall casbin pycasbin
+python -m pip install apache-casbin
+```
+
+These distributions own overlapping `casbin/` files and must not be installed
+together. Adapters that still declare a dependency on `casbin` or `pycasbin` can
+reinstall a legacy distribution; use a compatible adapter release declaring
+`apache-casbin`, or keep the existing environment until its migration is supported.
+The async adapter example below describes the API, not a claim that every
+published adapter has migrated its package dependencies.
 
 ## Documentation
 

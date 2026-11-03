@@ -1,3 +1,5 @@
+# Based on github/gitignore Python.gitignore (CC0-1.0).
+# See LICENSE for the scoped template license; project-specific ignores follow.
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

@@ -1,16 +1,21 @@
-# Copyright 2026 The casbin Authors. All Rights Reserved.
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
+#   https://www.apache.org/licenses/LICENSE-2.0
 #
-#      http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
+import math
 
 from casbin.cache import DefaultCache
 from casbin.enforcer import Enforcer
@@ -102,12 +107,12 @@ class CacheSupport:
         decision is not a pure function of the request and caching it would keep granting
         access after the role has expired.
 
-        Setting an expire time is treated as accepting a known, bounded amount of
-        staleness, so it re-enables caching.
+        Setting a positive, finite expire time accepts a bounded amount of
+        staleness and re-enables caching. An unbounded expiry must not do so.
         """
         if not self.cond_rm_map:
             return False
-        if self._expire_time is not None:
+        if self._expire_time is not None and self._expire_time > 0 and math.isfinite(self._expire_time):
             return False
 
         if not self._warned_about_dynamic_model:
@@ -134,8 +139,7 @@ class CacheSupport:
         cached = self._cache.get(key, _MISSING)
         if cached is not _MISSING:
             result, explain = cached
-            # hand out a copy: the explanation upstream is the policy row itself, and a
-            # caller mutating it would corrupt both the cache and the model.
+            # Hand out a fresh explanation so callers cannot alter later cache hits.
             return result, list(explain)
 
         result, explain = super().enforce_ex(*rvals)

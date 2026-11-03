@@ -1,92 +1,139 @@
-name: release
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
 
-# Releases are triggered manually by pushing a git tag:
-#   - v1.4.0-rc1  -> GitHub pre-release (the candidate used for the Apache vote)
-#   - v1.4.0      -> GitHub release + publish to PyPI
+name: Release
+
 on:
   push:
-    tags:
-      - "v*"
+    tags: ['v*-rc*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing final tag vX.Y.Z, pointing at the approved candidate commit'
+        required: true
+        type: string
+      project_result:
+        description: 'Public project vote result URL (lists.apache.org/thread/...)'
+        required: true
+        type: string
+      incubator_result:
+        description: 'Public IPMC vote result URL (lists.apache.org/thread/...)'
+        required: true
+        type: string
 
 permissions:
   contents: write
 
+concurrency:
+  group: release-${{ github.repository }}-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
 jobs:
   release:
-    name: Release
+    if: github.repository == 'apache/casbin-pycasbin' && (github.event_name == 'push' || github.ref == 'refs/heads/master')
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          python-version: "3.12"
-
-      - name: Resolve version from tag
-        id: version
-        run: |
-          set -euo pipefail
-          TAG="${GITHUB_REF_NAME}"
-          # v1.4.0-rc1 -> 1.4.0-rc1, v1.4.0 -> 1.4.0
-          VERSION="${TAG#v}"
-          # The release candidate is voted on as the final version, so strip "-rcN".
-          BASE_VERSION="${VERSION%%-rc*}"
-          if [ "$VERSION" != "$BASE_VERSION" ]; then
-            PRERELEASE=true
-          else
-            PRERELEASE=false
-          fi
-
-          # The source release must describe its own version, so pyproject.toml
-          # has to be bumped and committed before the tag is pushed.
-          PROJECT_VERSION="$(python -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")"
-          if [ "$PROJECT_VERSION" != "$BASE_VERSION" ]; then
-            echo "::error::tag $TAG expects version $BASE_VERSION in pyproject.toml, found $PROJECT_VERSION"
-            exit 1
-          fi
-
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "base_version=$BASE_VERSION" >> "$GITHUB_OUTPUT"
-          echo "prerelease=$PRERELEASE" >> "$GITHUB_OUTPUT"
-
-      - name: Build Apache source release
+          ref: ${{ inputs.tag || github.ref }}
+          fetch-depth: 0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.12'
+      - name: Validate mode and committed version
+        id: meta
         env:
-          BASE_VERSION: ${{ steps.version.outputs.base_version }}
+          TAG: ${{ inputs.tag || github.ref_name }}
+          EVENT: ${{ github.event_name }}
+          PROJECT_RESULT: ${{ inputs.project_result }}
+          INCUBATOR_RESULT: ${{ inputs.incubator_result }}
         run: |
           set -euo pipefail
-          NAME="apache-casbin-pycasbin-${BASE_VERSION}-incubating-src"
-          git archive --format=tar.gz --prefix="${NAME}/" -o "${NAME}.tar.gz" HEAD
-          sha512sum "${NAME}.tar.gz" > "${NAME}.tar.gz.sha512"
-
-      - name: Build Python distributions
-        if: steps.version.outputs.prerelease == 'false'
-        run: |
-          python -m pip install --upgrade build
-          python -m build
-
-      - name: Create GitHub release
+          python .github/scripts/release.py meta "$TAG" >> "$GITHUB_OUTPUT"
+          if [[ "$EVENT" == workflow_dispatch ]]; then
+            [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
+            [[ "$PROJECT_RESULT" =~ ^https://lists\.apache\.org/thread/[a-z0-9]+$ ]]
+            [[ "$INCUBATOR_RESULT" =~ ^https://lists\.apache\.org/thread/[a-z0-9]+$ ]]
+          else
+            [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-rc[1-9][0-9]*$ ]]
+          fi
+      - name: Refuse replacement of an existing GitHub release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ github.ref_name }}
-          PRERELEASE: ${{ steps.version.outputs.prerelease }}
+          TAG: ${{ inputs.tag || github.ref_name }}
         run: |
           set -euo pipefail
-          if [ "$PRERELEASE" = "true" ]; then
-            FLAGS="--prerelease"
-          else
-            FLAGS="--latest"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo '::error::Release exists; assets will not be overwritten. Inspect partial publication before retrying.'
+            exit 1
           fi
-          gh release create "$TAG" \
-            --title "$TAG" \
-            --generate-notes \
-            $FLAGS \
-            apache-casbin-pycasbin-*-incubating-src.tar.gz \
-            apache-casbin-pycasbin-*-incubating-src.tar.gz.sha512
-
-      - name: Publish to PyPI
-        if: steps.version.outputs.prerelease == 'false'
-        uses: pypa/gh-action-pypi-publish@release/v1
+      - name: Export unsigned source candidate
+        if: steps.meta.outputs.is_rc == 'true'
+        env:
+          TAG: ${{ github.ref_name }}
+        run: python .github/scripts/release.py archive "$TAG"
+      - name: Verify approved ASF originals against the final tag
+        if: steps.meta.outputs.is_rc == 'false'
+        env:
+          TAG: ${{ inputs.tag }}
+        run: python .github/scripts/release.py verify "$TAG"
+      - name: Build and test Python distributions from approved source
+        if: steps.meta.outputs.is_rc == 'false'
+        env:
+          NAME: ${{ steps.meta.outputs.name }}
+        run: |
+          set -euo pipefail
+          cd "dist-release/source/$NAME"
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt -r requirements_dev.txt build
+          python -m unittest discover -s tests -t tests
+          python -m build --outdir "$GITHUB_WORKSPACE/python-dist"
+          for package in "$GITHUB_WORKSPACE"/python-dist/*; do
+            python "$GITHUB_WORKSPACE/.github/scripts/release.py" python-check "$package"
+          done
+      - name: Publish approved-source Python distributions
+        if: steps.meta.outputs.is_rc == 'false'
+        uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # release/v1
         with:
-          password: ${{ secrets.PYPI_TOKEN_CASBIN }}
+          password: ${{ secrets.PYPI_TOKEN }}
+          packages-dir: python-dist/
+
+      - name: Write release notes
+        env:
+          IS_RC: ${{ steps.meta.outputs.is_rc }}
+          VERSION: ${{ steps.meta.outputs.version }}
+          PROJECT_RESULT: ${{ inputs.project_result }}
+          INCUBATOR_RESULT: ${{ inputs.incubator_result }}
+        run: |
+          printf 'Apache Casbin (Incubating) — PyCasbin %s\n\n' "$VERSION" > release-notes.md
+          cat DISCLAIMER >> release-notes.md
+          if [[ "$IS_RC" == true ]]; then
+            printf '\n\nUnsigned source candidate for review; the RM must sign and stage it before voting. This is not an approved release.\n' >> release-notes.md
+          else
+            printf '\n\nProject result: %s\nIPMC result: %s\nSource assets are the approved ASF originals.\n' "$PROJECT_RESULT" "$INCUBATOR_RESULT" >> release-notes.md
+            printf '\nSource: https://downloads.apache.org/incubator/casbin/pycasbin-%s-incubating/\nKEYS: https://downloads.apache.org/incubator/casbin/KEYS\nVerification: https://www.apache.org/info/verification.html\n' "$VERSION" >> release-notes.md
+          fi
+      - name: Create GitHub release without replacing assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ inputs.tag || github.ref_name }}
+          IS_RC: ${{ steps.meta.outputs.is_rc }}
+        run: |
+          set -euo pipefail
+          kind=(--latest)
+          if [[ "$IS_RC" == true ]]; then kind=(--prerelease --latest=false); fi
+          gh release create "$TAG" --title "$TAG (Apache Casbin Incubating)" --notes-file release-notes.md "${kind[@]}" dist-release/*.tar.gz dist-release/*.sha512 $(find dist-release -maxdepth 1 -name '*.asc' -print)
