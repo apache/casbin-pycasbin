@@ -1,56 +1,65 @@
-# Copyright 2021 The casbin Authors. All Rights Reserved.
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
+#   https://www.apache.org/licenses/LICENSE-2.0
 #
-#      http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
 
-from threading import RLock, Condition
+"""Compatibility wrappers for the separately installed MIT-licensed readerwriterlock.
 
-# This implementation was adapted from https://en.wikipedia.org/wiki/Readers%E2%80%93writer_lock
+A lock handle from that library records acquisition state. Give each acquisition
+its own handle so the context objects shared by SyncedEnforcer remain safe when
+several threads enter the same read context concurrently.
+"""
+
+from threading import local
+
+from readerwriterlock.rwlock import RWLockWrite as _WriterPreferredLock
+
+
+class _ThreadLocks(local):
+    def __init__(self):
+        self.read = []
+        self.write = []
 
 
 class RWLockWrite:
-    """write preferring readers-wirter lock"""
+    """A writer-preferring lock retaining Casbin's existing context/direct API."""
 
     def __init__(self):
-        self._lock = RLock()
-        self._cond = Condition(self._lock)
-        self._active_readers = 0
-        self._waiting_writers = 0
-        self._writer_active = False
+        self._delegate = _WriterPreferredLock()
+        self._held = _ThreadLocks()
 
     def aquire_read(self):
-        with self._lock:
-            while self._waiting_writers > 0 or self._writer_active:
-                self._cond.wait()
-            self._active_readers += 1
+        # Preserve the historical method spelling for existing callers.
+        handle = self._delegate.gen_rlock()
+        handle.acquire()
+        self._held.read.append(handle)
 
     def release_read(self):
-        with self._lock:
-            self._active_readers -= 1
-            if self._active_readers == 0:
-                self._cond.notify_all()
+        if not self._held.read:
+            raise RuntimeError("No read lock acquired by this thread")
+        self._held.read.pop().release()
 
     def aquire_write(self):
-        with self._lock:
-            self._waiting_writers += 1
-            while self._active_readers > 0 or self._writer_active:
-                self._cond.wait()
-            self._waiting_writers -= 1
-            self._writer_active = True
+        handle = self._delegate.gen_wlock()
+        handle.acquire()
+        self._held.write.append(handle)
 
     def release_write(self):
-        with self._lock:
-            self._writer_active = False
-            self._cond.notify_all()
+        if not self._held.write:
+            raise RuntimeError("No write lock acquired by this thread")
+        self._held.write.pop().release()
 
     def gen_rlock(self):
         return ReadRWLock(self)
