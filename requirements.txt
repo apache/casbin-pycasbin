@@ -1,2 +1,2 @@
-simpleeval >= 1.0.3
+simpleeval >= 1.0.5
 wcmatch >= 10.1
