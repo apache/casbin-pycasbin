@@ -23,7 +23,6 @@ from email.parser import BytesParser
 import gzip
 import hashlib
 import io
-import json
 import re
 import subprocess
 import tarfile
@@ -49,11 +48,7 @@ def metadata(tag):
         raise ValueError("Use vX.Y.Z or vX.Y.Z-rcN (N >= 1)")
     version, rc = match.groups()
     manifest = git("show", f"{tag}:{MANIFEST}")
-    actual = (
-        json.loads(manifest)["version"]
-        if MANIFEST.endswith("json")
-        else tomllib.loads(manifest.decode())["project"]["version"]
-    )
+    actual = tomllib.loads(manifest.decode())["project"]["version"]
     if actual != version:
         raise ValueError(f"Commit version {actual} does not match {version}; no version stamping")
     name = f"apache-{PROJECT}-{version}-incubating-src"

@@ -39,7 +39,7 @@ class ReleaseSafetyTest(unittest.TestCase):
         subprocess.run(["git", "init", "-q"], check=True)
         for key, value in (("user.name", "Fixture"), ("user.email", "fixture@example.invalid")):
             subprocess.run(["git", "config", key, value], check=True)
-        text = '{"version":"1.2.3"}\n' if release.MANIFEST.endswith("json") else '[project]\nversion="1.2.3"\n'
+        text = '[project]\nversion="1.2.3"\n'
         Path(release.MANIFEST).write_text(text, encoding="utf8")
         for filename in ("LICENSE", "NOTICE", "DISCLAIMER", "README.md"):
             Path(filename).write_text(
