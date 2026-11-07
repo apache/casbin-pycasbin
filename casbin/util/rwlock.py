@@ -27,40 +27,39 @@ from threading import local
 from readerwriterlock.rwlock import RWLockWrite as _WriterPreferredLock
 
 
+class _ThreadLocks(local):
+    def __init__(self):
+        self.read = []
+        self.write = []
+
+
 class RWLockWrite:
     """A writer-preferring lock retaining Casbin's existing context/direct API."""
 
     def __init__(self):
         self._delegate = _WriterPreferredLock()
-        self._held = local()
-
-    def _acquire(self, kind):
-        handle = self._delegate.gen_rlock() if kind == "read" else self._delegate.gen_wlock()
-        handle.acquire()
-        stack = getattr(self._held, kind, None)
-        if stack is None:
-            stack = []
-            setattr(self._held, kind, stack)
-        stack.append(handle)
-
-    def _release(self, kind):
-        stack = getattr(self._held, kind, None)
-        if not stack:
-            raise RuntimeError("No {} lock acquired by this thread".format(kind))
-        stack.pop().release()
+        self._held = _ThreadLocks()
 
     def aquire_read(self):
         # Preserve the historical method spelling for existing callers.
-        self._acquire("read")
+        handle = self._delegate.gen_rlock()
+        handle.acquire()
+        self._held.read.append(handle)
 
     def release_read(self):
-        self._release("read")
+        if not self._held.read:
+            raise RuntimeError("No read lock acquired by this thread")
+        self._held.read.pop().release()
 
     def aquire_write(self):
-        self._acquire("write")
+        handle = self._delegate.gen_wlock()
+        handle.acquire()
+        self._held.write.append(handle)
 
     def release_write(self):
-        self._release("write")
+        if not self._held.write:
+            raise RuntimeError("No write lock acquired by this thread")
+        self._held.write.pop().release()
 
     def gen_rlock(self):
         return ReadRWLock(self)
