@@ -24,7 +24,7 @@ import casbin
 
 def model(matcher="g(r.sub, p.sub) && r.obj == p.obj && r.act == p.act"):
     result = casbin.Model()
-    result.load_model_from_text("""
+    model_text = """
 [request_definition]
 r = sub, obj, act
 [policy_definition]
@@ -34,7 +34,8 @@ g = _, _
 [policy_effect]
 e = some(where (p.eft == allow))
 [matchers]
-m = """ + matcher)
+m = """
+    result.load_model_from_text(model_text + matcher)
     return result
 
 
