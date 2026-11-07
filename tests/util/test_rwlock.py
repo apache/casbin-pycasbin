@@ -17,9 +17,63 @@ from casbin.util.rwlock import RWLockWrite
 from concurrent.futures import ThreadPoolExecutor
 import time
 import queue
+import threading
 
 
 class TestRWLock(TestCase):
+    def test_shared_read_context_keeps_both_readers_locked(self):
+        lock = RWLockWrite()
+        read = lock.gen_rlock()
+        entered = [threading.Event(), threading.Event()]
+        leave = [threading.Event(), threading.Event()]
+        finished = [threading.Event(), threading.Event()]
+        written = threading.Event()
+
+        def reader(index):
+            with read:
+                entered[index].set()
+                leave[index].wait(5)
+            finished[index].set()
+
+        def writer():
+            with lock.gen_wlock():
+                written.set()
+
+        threads = [threading.Thread(target=reader, args=(i,), daemon=True) for i in range(2)]
+        for thread in threads:
+            thread.start()
+        writer_thread = threading.Thread(target=writer, daemon=True)
+        try:
+            self.assertTrue(all(event.wait(2) for event in entered))
+            writer_thread.start()
+            self.assertFalse(written.wait(0.05))
+            leave[0].set()
+            self.assertTrue(finished[0].wait(2))
+            self.assertFalse(written.wait(0.05))
+            leave[1].set()
+            self.assertTrue(written.wait(2))
+        finally:
+            for event in leave:
+                event.set()
+            for thread in threads:
+                thread.join(2)
+            if writer_thread.ident is not None:
+                writer_thread.join(2)
+
+    def test_direct_api_and_nested_read_contexts(self):
+        lock = RWLockWrite()
+        lock.aquire_read()
+        with lock.gen_rlock():
+            pass
+        lock.release_read()
+        lock.aquire_write()
+        lock.release_write()
+        with self.assertRaises(ValueError):
+            with lock.gen_wlock():
+                raise ValueError("caller failure")
+        with lock.gen_wlock():
+            pass
+
     def gen_locks(self):
         rw_lock = RWLockWrite()
         rl = rw_lock.gen_rlock()
