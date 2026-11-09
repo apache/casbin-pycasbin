@@ -14,7 +14,15 @@
 
 import re
 
-_INTERESTING_TOKENS_RE = re.compile(r"[,\[\]\(\)]")
+_INTERESTING_TOKENS_RE = re.compile(r'[,\[\]\(\)"]')
+
+
+def _unquote(token):
+    """Strip whitespace, then remove the quotes of a double-quoted field ("" stands for one quote)."""
+    token = token.strip()
+    if len(token) >= 2 and token[0] == '"' and token[-1] == '"':
+        return token[1:-1].replace('""', '"')
+    return token
 
 
 def _extract_tokens(line):
@@ -35,23 +43,40 @@ def _extract_tokens(line):
     #
     # - [](): adjust the nesting depth
     # - ,: slice the line to save the token, if the , is at the top-level, outside all []()
+    # - ": a quote that opens a field starts a quoted field, as in CSV: commas and brackets inside
+    #   it are part of the value, "" is a literal quote, and the enclosing quotes are removed.
+    #   A quote anywhere else in a field is part of the value.
     #
     # `start_idx` represents the start of the current token, that we haven't seen a `,` for yet.
     start_idx = 0
+    in_quotes = False
+    skip_quote = False
     for match in _INTERESTING_TOKENS_RE.finditer(line):
         c = match.group()
-        if c == "[" or c == "(":
+        if in_quotes:
+            if c == '"':
+                if skip_quote:
+                    skip_quote = False
+                elif line[match.end() : match.end() + 1] == '"':
+                    skip_quote = True
+                else:
+                    in_quotes = False
+            continue
+        if c == '"':
+            if not stack and line[start_idx : match.start()].strip() == "":
+                in_quotes = True
+        elif c == "[" or c == "(":
             stack.append(c)
         elif c == "]" or c == ")":
             stack.pop()
         elif not stack:
             # must be a comma outside of any nesting: we've found the end of a top level token so
             # save that and start a new one
-            tokens.append(line[start_idx : match.start()].strip())
+            tokens.append(_unquote(line[start_idx : match.start()]))
             start_idx = match.end()
 
     # trailing token after the last ,
-    tokens.append(line[start_idx:].strip())
+    tokens.append(_unquote(line[start_idx:]))
 
     return tokens
 
