@@ -14,7 +14,7 @@
 
 import os
 
-from ..adapter import Adapter, load_policy_line
+from ..adapter import Adapter, load_policy_line, policy_line_to_csv
 
 
 class FileAdapter(Adapter):
@@ -47,24 +47,14 @@ class FileAdapter(Adapter):
                 line = file.readline()
 
     def _save_policy_file(self, model):
+        lines = []
+        for sec in ("p", "g"):
+            for key, ast in model.model.get(sec, {}).items():
+                for pvals in ast.policy:
+                    lines.append(policy_line_to_csv(key, pvals))
+
         with open(self._file_path, "w") as file:
-            lines = []
-
-            if "p" in model.model.keys():
-                for key, ast in model.model["p"].items():
-                    for pvals in ast.policy:
-                        lines.append(key + ", " + ", ".join(pvals))
-
-            if "g" in model.model.keys():
-                for key, ast in model.model["g"].items():
-                    for pvals in ast.policy:
-                        lines.append(key + ", " + ", ".join(pvals))
-
-            for i, line in enumerate(lines):
-                if i != len(lines) - 1:
-                    lines[i] += "\n"
-
-            file.writelines(lines)
+            file.write("\n".join(lines))
 
     def add_policy(self, sec, ptype, rule):
         pass

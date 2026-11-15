@@ -17,43 +17,90 @@ import re
 _INTERESTING_TOKENS_RE = re.compile(r"[,\[\]\(\)]")
 
 
+def _skip_blanks(line, i):
+    while i < len(line) and line[i] in " \t":
+        i += 1
+    return i
+
+
+def _read_quoted_field(line, start):
+    """Read a CSV quoted field whose opening quote is at `start`: commas and brackets inside it are
+    part of the value and "" is one quote character. Return (value, end), where `end` is the index
+    of the comma after the field or len(line), or None if the quotes do not form a whole field, in
+    which case the field is read as a plain one."""
+
+    chars = []
+    i = start + 1
+    while i < len(line):
+        c = line[i]
+        if c != '"':
+            chars.append(c)
+            i += 1
+        elif line[i + 1 : i + 2] == '"':
+            chars.append('"')
+            i += 2
+        else:
+            end = _skip_blanks(line, i + 1)
+            if end == len(line) or line[end] == ",":
+                return "".join(chars), end
+            return None
+    return None
+
+
+def _read_plain_field(line, start):
+    """Read a field that ends at the next comma outside all []() nesting, e.g. `abc(def, ghi)`.
+    Return (value, end) like _read_quoted_field()."""
+
+    depth = 0
+    for match in _INTERESTING_TOKENS_RE.finditer(line, start):
+        c = match.group()
+        if c == "[" or c == "(":
+            depth += 1
+        elif c == "]" or c == ")":
+            depth = max(depth - 1, 0)
+        elif depth == 0:
+            return line[start : match.start()].strip(), match.start()
+    return line[start:].strip(), len(line)
+
+
 def _extract_tokens(line):
     """Return the list of 'tokens' from the line, or None if this line has none"""
 
-    if line == "":
+    if line == "" or line[:1] == "#":
         return None
 
-    if line[:1] == "#":
-        return None
-
-    stack = []
     tokens = []
+    i = 0
+    while True:
+        field = None
+        quote = _skip_blanks(line, i)
+        if line[quote : quote + 1] == '"':
+            field = _read_quoted_field(line, quote)
+        if field is None:
+            field = _read_plain_field(line, i)
+        value, i = field
+        tokens.append(value)
+        if i == len(line):
+            return tokens
+        i += 1
 
-    # The tokens are separated by commas, but we support nesting so a naive `line.split(",")` is
-    # wrong. E.g. `abc(def, ghi), jkl` is two tokens: `abc(def, ghi)` and `jkl`. We do this by
-    # iterating over the locations of any tokens of interest, and either:
-    #
-    # - [](): adjust the nesting depth
-    # - ,: slice the line to save the token, if the , is at the top-level, outside all []()
-    #
-    # `start_idx` represents the start of the current token, that we haven't seen a `,` for yet.
-    start_idx = 0
-    for match in _INTERESTING_TOKENS_RE.finditer(line):
-        c = match.group()
-        if c == "[" or c == "(":
-            stack.append(c)
-        elif c == "]" or c == ")":
-            stack.pop()
-        elif not stack:
-            # must be a comma outside of any nesting: we've found the end of a top level token so
-            # save that and start a new one
-            tokens.append(line[start_idx : match.start()].strip())
-            start_idx = match.end()
 
-    # trailing token after the last ,
-    tokens.append(line[start_idx:].strip())
+def _quote_field(value):
+    value = str(value)
+    if "\n" in value or "\r" in value:
+        raise ValueError("invalid policy field %r: line breaks are not allowed" % value)
+    # an unclosed bracket would also take in the fields after it
+    if "," in value or '"' in value or value != value.strip() or _read_plain_field(value + ",", 0)[0] != value:
+        return '"' + value.replace('"', '""') + '"'
+    return value
 
-    return tokens
+
+def policy_line_to_csv(ptype, rule):
+    """Return the text line of a policy rule that load_policy_line() reads back as the same rule:
+    a field containing a comma or a double quote, or with leading or trailing blanks, is written as
+    a CSV quoted field."""
+
+    return ", ".join([ptype] + [_quote_field(v) for v in rule])
 
 
 def load_policy_line(line, model):
