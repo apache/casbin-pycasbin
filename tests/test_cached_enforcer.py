@@ -629,6 +629,21 @@ class TestConditionalRolesAreNeverCached(TestCase):
         self.assertTrue(e.enforce("alice", "data2", "read"))
         self.assertEqual(len(e.get_cache()), 1)
 
+    def test_unbounded_expiry_does_not_cache_conditional_roles(self):
+        for expiry in (0, -1, float("inf"), float("nan")):
+            with self.subTest(expiry=expiry):
+                e = self.get_enforcer()
+                e.set_expire_time(expiry)
+                e.set_named_link_condition_func_params(
+                    "g", "alice", "data2_admin", "2000-01-01 00:00:00", "2100-01-01 00:00:00"
+                )
+                self.assertTrue(e.enforce("alice", "data2", "read"))
+                e.set_named_link_condition_func_params(
+                    "g", "alice", "data2_admin", "2000-01-01 00:00:00", "2000-01-02 00:00:00"
+                )
+                self.assertFalse(e.enforce("alice", "data2", "read"))
+                self.assertEqual(len(e.get_cache()), 0)
+
 
 class TestSyncedCachedEnforcer(TestCase):
     def get_enforcer(self, model, policy):

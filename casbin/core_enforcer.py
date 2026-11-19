@@ -663,7 +663,7 @@ class CoreEnforcer:
 
         explain_rule = []
         if explain_index != -1 and explain_index < policy_len:
-            explain_rule = self.model["p"][ptype].policy[explain_index]
+            explain_rule = list(self.model["p"][ptype].policy[explain_index])
 
         return result, explain_rule
 
