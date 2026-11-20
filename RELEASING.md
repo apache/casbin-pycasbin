@@ -29,11 +29,11 @@ Apache source packages are the release artifacts. PyPI wheels and sdists are con
 
 The Apache distribution is `apache-casbin` and the import package remains `casbin`. The package identity is separate from registry ownership and release approval. Avoid co-installing legacy `casbin`/`pycasbin`, which contain overlapping import files. Adapter dependency migrations are separate components and do not silently substitute an old core in candidate verification.
 
-The synchronized enforcer uses the separately installed MIT-licensed `readerwriterlock` dependency. A small Casbin wrapper retains the context/direct API and gives each acquisition a separate handle, including when several threads share the same read context. It replaces the historical implementation carrying an unresolved Wikipedia-adaptation notice rather than re-licensing that code. The dependency is not bundled in the Apache source or Python distributions; inspect its resolved version/license separately.
+The synchronized enforcer uses the in-tree lock in `casbin/util/rwlock.py`. Review the provenance and terms for the adaptation identified in that file before signing a candidate.
 
 ## Prepare and test
 
-Use Python 3.9 or newer for the library, and Python 3.12 for release tooling. The dependency requirements already require Python 3.9. Prepare the committed version, all scoped fixes, ASF headers, legal files, metadata, distributions and workflow changes together in one preparation PR. Retain origin notices and resolve third-party licensing before submission.
+Use Python 3.9 or newer for the library, and Python 3.12 for release tooling. The dependency requirements already require Python 3.9. Prepare the committed version, scoped fixes, ASF headers, legal files, metadata, distributions and workflow changes for review. Retain origin notices and resolve third-party licensing before submission.
 
 ```sh
 python -m pip install -r requirements_dev.txt coverage build twine
@@ -67,7 +67,7 @@ https://downloads.apache.org/incubator/casbin/pycasbin-X.Y.Z-incubating/
 
 Create the final `vX.Y.Z` tag at the approved candidate commit. A final-tag push performs no publication. After the approvals and ASF promotion, dispatch `release.yml` **from master** with that existing tag and the actual public project and IPMC result-thread URLs. The URLs are auditable references; a URL-shaped string does not prove that a vote passed. The release manager must validate their scope, votes and candidate binding before dispatch.
 
-The workflow refuses an existing GitHub release, verifies committed version and strict tag syntax, downloads the promoted ASF originals, validates SHA-512 and GPG against downloaded KEYS, and compares every archived file's bytes and permissions with the tag. Only then does it build convenience packages from the extracted approved source, run tests, inspect Python contents and use `PYPI_TOKEN_CASBIN` to publish. Source assets are reused unchanged; the final archive is never regenerated. GitHub notes include the disclaimer, result links and verification instructions.
+The workflow refuses an existing GitHub release, verifies committed version and strict tag syntax, downloads the promoted ASF originals, validates SHA-512 and GPG against downloaded KEYS, and compares every archived file's bytes and permissions with the tag. Only then does it build convenience packages from the extracted approved source, run tests, inspect Python contents and use `PYPI_TOKEN` to publish. Source assets are reused unchanged; the final archive is never regenerated. GitHub notes include the disclaimer, result links and verification instructions.
 
 Record registry administration and credential access for the PPMC separately from GitHub/tag and ASF SVN permissions. Never test the release by performing a real registry upload. Inspect the actual installed PyPI package, official downloads, website and announcements after approved publication.
 
