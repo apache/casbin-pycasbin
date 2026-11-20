@@ -43,6 +43,7 @@ class PolicyIndex:
 
         self.request_key = request_key
         self.policy_key = policy_key
+        self.rtype = None
         self._lock = threading.Lock()
         self._built = False
         self._version = 0

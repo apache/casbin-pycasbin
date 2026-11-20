@@ -121,6 +121,7 @@ class CoreEnforcer:
         self.rm_map = dict()
         self.cond_rm_map = dict()
         self.eft = get_effector(self.model["e"]["e"].value)
+        self._effectors = dict()
         self.watcher = None
 
         self.enabled = True
@@ -202,6 +203,18 @@ class CoreEnforcer:
         """sets the current effector."""
         self.eft = eft
 
+    def _get_effector(self, etype):
+        if etype == "e" or "e" not in self.model["e"]:
+            return self.eft
+        value = self.model["e"][etype].value
+        if value == self.model["e"]["e"].value:
+            return self.eft
+        eft = self._effectors.get(value)
+        if eft is None:
+            eft = get_effector(value)
+            self._effectors[value] = eft
+        return eft
+
     def set_policy_index(self, ptype, index):
         """partitions the policy rules of ptype with a PolicyIndex."""
         if not isinstance(index, PolicyIndex):
@@ -213,8 +226,9 @@ class CoreEnforcer:
     def set_policy_index_by_token(self, ptype, request_token, policy_token):
         """partitions ptype's rules by the string value of two tokens.
 
-        It uses the default request type "r"; use set_policy_index with a
-        custom function when enforcing through an EnforceContext.
+        It applies only to requests of the default request type "r"; requests
+        of other types evaluate every rule. Use set_policy_index with a custom
+        function when enforcing through an EnforceContext.
         """
         if "r" not in self.model.keys() or "r" not in self.model["r"]:
             raise ValueError('request type "r" does not exist')
@@ -243,7 +257,9 @@ class CoreEnforcer:
                 return ""
             return rule[index]
 
-        self.set_policy_index(ptype, PolicyIndex(request_key, policy_key))
+        index = PolicyIndex(request_key, policy_key)
+        index.rtype = "r"
+        self.set_policy_index(ptype, index)
 
     def remove_policy_index(self, ptype):
         """removes the policy partition for ptype."""
@@ -561,6 +577,8 @@ class CoreEnforcer:
         policy_len = len(self.model["p"][ptype].policy)
 
         policy_index = self._policy_indexes.get(ptype)
+        if policy_index is not None and policy_index.rtype not in (None, rtype):
+            policy_index = None
         bucket_ids = None
         request_bucket = 0
         use_policy_index = False
@@ -569,7 +587,8 @@ class CoreEnforcer:
             request_bucket, use_policy_index = policy_index.request_bucket(rvals)
 
         shortcut_allow_and_deny = False
-        if policy_len != 0 and type(self.eft) is AllowAndDenyEffector:
+        effector = self._get_effector(etype)
+        if policy_len != 0 and type(effector) is AllowAndDenyEffector:
             has_deny, all_valid = self._policy_has_deny(ptype, p_tokens)
             shortcut_allow_and_deny = all_valid and not has_deny
 
@@ -622,7 +641,7 @@ class CoreEnforcer:
                     explain_index = i
                     break
 
-                if self.eft.intermediate_effect(policy_effects) != Effector.INDETERMINATE:
+                if effector.intermediate_effect(policy_effects) != Effector.INDETERMINATE:
                     explain_index = i
                     break
 
@@ -642,9 +661,9 @@ class CoreEnforcer:
             else:
                 policy_effects.add(Effector.INDETERMINATE)
 
-        final_effect = self.eft.final_effect(policy_effects)
+        final_effect = effector.final_effect(policy_effects)
         result = effect_to_bool(final_effect)
-        if explain_index == -1 and final_effect == Effector.ALLOW and isinstance(self.eft, AllowAndDenyEffector):
+        if explain_index == -1 and final_effect == Effector.ALLOW and isinstance(effector, AllowAndDenyEffector):
             explain_index = allow_index
 
         # Log request.

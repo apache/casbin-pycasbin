@@ -139,13 +139,21 @@ class Model(Policy):
 
         return None
 
-    def sort_policies_by_subject_hierarchy(self):
-        if self["e"]["e"].value != "subjectPriority(p_eft) || deny":
-            return
+    def _effect_for_policy_type(self, ptype):
+        effects = self["e"] if "e" in self.keys() else {}
+        etype = "e" + ptype[1:]
+        if etype in effects:
+            return effects[etype].value
+        if "e" in effects:
+            return effects["e"].value
+        return ""
 
+    def sort_policies_by_subject_hierarchy(self):
         sub_index = 0
         domain_index = -1
         for ptype, assertion in self["p"].items():
+            if self._effect_for_policy_type(ptype) != "subjectPriority(p_eft) || deny":
+                continue
             for index, token in enumerate(assertion.tokens):
                 if token == "{}_dom".format(ptype):
                     domain_index = index
