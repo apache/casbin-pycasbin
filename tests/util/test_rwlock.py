@@ -65,6 +65,16 @@ class TestRWLock(TestCase):
 
         self.assertGreaterEqual(exec_time, delay * num_writers)
 
+    def test_release_from_another_thread(self):
+        reader, writer = self.gen_locks()
+        with ThreadPoolExecutor(1) as executor:
+            for lock in (reader, writer):
+                with self.subTest(lock=type(lock).__name__):
+                    self.assertIsNone(lock.__enter__())
+                    self.assertFalse(executor.submit(lock.__exit__, None, None, None).result(timeout=5))
+                    with lock:
+                        pass
+
     def test_writer_preference(self):
         [rl, wl] = self.gen_locks()
 

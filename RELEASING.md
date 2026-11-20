@@ -29,7 +29,7 @@ Apache source packages are the release artifacts. PyPI wheels and sdists are con
 
 The Apache distribution is `apache-casbin` and the import package remains `casbin`. The package identity is separate from registry ownership and release approval. Avoid co-installing legacy `casbin`/`pycasbin`, which contain overlapping import files. Adapter dependency migrations are separate components and do not silently substitute an old core in candidate verification.
 
-The synchronized enforcer uses the in-tree lock in `casbin/util/rwlock.py`. Review the provenance and terms for the adaptation identified in that file before signing a candidate.
+The synchronized enforcer uses the standard-library-based lock in `casbin/util/rwlock.py`. It retains writer preference, shared read contexts, and release from another thread. Review the change and its compatibility checks alongside the source artifacts.
 
 ## Prepare and test
 
