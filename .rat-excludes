@@ -1,0 +1,58 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
+# CC0 ignore template: scoped full license in LICENSE.
+.gitignore
+# Individually reviewed literal policy fixtures; RAT matches basenames.
+# Exact source paths and inventory reconciliation are retained in the release record.
+abac_multiple_rules_policy.csv
+abac_rule_policy.csv
+basic_inverse_policy.csv
+basic_policy.csv
+basic_without_resources_policy.csv
+basic_without_users_policy.csv
+empty_policy.csv
+error_policy.csv
+globmatch_policy.csv
+ipmatch_policy.csv
+keymatch2_policy.csv
+keymatch_policy.csv
+multiple_policy_definitions_policy.csv
+rbac_with_pattern_large_scale_policy.csv
+priority_indeterminate_policy.csv
+priority_policy.csv
+priority_policy_explicit.csv
+rbac_policy.csv
+rbac_with_all_pattern_policy.csv
+rbac_with_deny_policy.csv
+rbac_with_domain_and_policy_pattern_policy.csv
+rbac_with_domain_pattern_policy.csv
+rbac_with_domain_temporal_roles_condition_policy.csv
+rbac_with_domain_temporal_roles_policy.csv
+rbac_with_domains_policy.csv
+rbac_with_domains_policy2.csv
+rbac_with_hierarchy_policy.csv
+rbac_with_hierarchy_with_domains_policy.csv
+rbac_with_hierarchy_without_policy_domains.csv
+rbac_with_multiple_policy_policy.csv
+rbac_with_multiply_matched_pattern.csv
+rbac_with_pattern_policy.csv
+rbac_with_resource_roles_policy.csv
+rbac_with_temporal_roles_condition_policy.csv
+rbac_with_temporal_roles_policy.csv
+subject_priority_policy.csv
+subject_priority_policy_with_domain.csv
