@@ -35,8 +35,7 @@ on:
         required: true
         type: string
 
-permissions:
-  contents: write
+permissions: {}
 
 concurrency:
   group: release-${{ github.repository }}-${{ inputs.tag || github.ref_name }}
@@ -46,11 +45,19 @@ jobs:
   release:
     if: github.repository == 'apache/casbin-pycasbin' && (github.event_name == 'push' || github.ref == 'refs/heads/master')
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      is_rc: ${{ steps.meta.outputs.is_rc }}
+      name: ${{ steps.meta.outputs.name }}
+      python_dist: ${{ steps.python-dist.outputs.artifact-id }}
+      github_release_files: ${{ steps.github-release-files.outputs.artifact-id }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           ref: ${{ inputs.tag || github.ref }}
           fetch-depth: 0
+          persist-credentials: false
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: '3.12'
@@ -105,13 +112,6 @@ jobs:
           for package in "$GITHUB_WORKSPACE"/python-dist/*; do
             python "$GITHUB_WORKSPACE/.github/scripts/release.py" python-check "$package"
           done
-      - name: Publish approved-source Python distributions
-        if: steps.meta.outputs.is_rc == 'false'
-        uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # release/v1
-        with:
-          password: ${{ secrets.PYPI_TOKEN }}
-          packages-dir: python-dist/
-
       - name: Write release notes
         env:
           IS_RC: ${{ steps.meta.outputs.is_rc }}
@@ -127,13 +127,89 @@ jobs:
             printf '\n\nProject result: %s\nIPMC result: %s\nSource assets are the approved ASF originals.\n' "$PROJECT_RESULT" "$INCUBATOR_RESULT" >> release-notes.md
             printf '\nSource: https://downloads.apache.org/incubator/casbin/pycasbin-%s-incubating/\nKEYS: https://downloads.apache.org/incubator/casbin/KEYS\nVerification: https://www.apache.org/info/verification.html\n' "$VERSION" >> release-notes.md
           fi
-      - name: Create GitHub release without replacing assets
+      - name: Create unsigned GitHub prerelease
+        if: steps.meta.outputs.is_rc == 'true'
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ inputs.tag || github.ref_name }}
-          IS_RC: ${{ steps.meta.outputs.is_rc }}
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+          NAME: ${{ steps.meta.outputs.name }}
         run: |
           set -euo pipefail
-          kind=(--latest)
-          if [[ "$IS_RC" == true ]]; then kind=(--prerelease --latest=false); fi
-          gh release create "$TAG" --title "$TAG (Apache Casbin Incubating)" --notes-file release-notes.md "${kind[@]}" dist-release/*.tar.gz dist-release/*.sha512 $(find dist-release -maxdepth 1 -name '*.asc' -print)
+          gh release create "$TAG" --verify-tag --prerelease --latest=false \
+            --title "$TAG (Apache Casbin Incubating)" --notes-file release-notes.md \
+            "dist-release/$NAME.tar.gz" "dist-release/$NAME.tar.gz.sha512"
+
+      - name: Collect the verified GitHub release files
+        if: steps.meta.outputs.is_rc == 'false'
+        env:
+          NAME: ${{ steps.meta.outputs.name }}
+        run: |
+          set -euo pipefail
+          archive="$NAME.tar.gz"
+          mkdir github-release-files
+          cp -- "dist-release/$archive" "dist-release/$archive.sha512" "dist-release/$archive.asc" release-notes.md github-release-files/
+          cd github-release-files
+          sha256sum -- "$archive" "$archive.sha512" "$archive.asc" release-notes.md > payload.sha256
+
+      - name: Retain checked Python distributions
+        if: steps.meta.outputs.is_rc == 'false'
+        id: python-dist
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: python-dist-${{ github.run_attempt }}
+          path: python-dist/
+          if-no-files-found: error
+
+      - name: Retain promoted ASF source and release notes
+        if: steps.meta.outputs.is_rc == 'false'
+        id: github-release-files
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: github-release-files-${{ github.run_attempt }}
+          path: github-release-files/
+          if-no-files-found: error
+
+  publish-pypi:
+    needs: release
+    if: github.event_name == 'workflow_dispatch' && needs.release.outputs.is_rc == 'false'
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write
+    steps:
+      - name: Download checked Python distributions from this run
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          artifact-ids: ${{ needs.release.outputs.python_dist }}
+          merge-multiple: true
+          path: python-dist/
+      - name: Publish approved-source Python distributions
+        uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # release/v1
+        with:
+          packages-dir: python-dist/
+
+  publish-github:
+    needs: [release, publish-pypi]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download the promoted ASF source and release notes from this run
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          artifact-ids: ${{ needs.release.outputs.github_release_files }}
+          merge-multiple: true
+          path: github-release-files/
+      - name: Create GitHub release without replacing assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+          NAME: ${{ needs.release.outputs.name }}
+        run: |
+          set -euo pipefail
+          cd github-release-files
+          archive="$NAME.tar.gz"
+          sha256sum --strict --check payload.sha256
+          gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --verify-tag --latest \
+            --title "$TAG (Apache Casbin Incubating)" --notes-file release-notes.md \
+            "$archive" "$archive.sha512" "$archive.asc"
