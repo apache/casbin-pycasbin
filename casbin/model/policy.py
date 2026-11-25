@@ -259,22 +259,23 @@ class Policy:
         ast = self[sec][ptype]
         old_rules_index = []
 
+        # resolve and check all rules before writing, since new_rules may reuse old_rules
         for old_rule in old_rules:
-            if old_rule in ast.policy:
-                old_rules_index.append(ast.policy.index(old_rule))
-            else:
+            if old_rule not in ast.policy:
                 return False
+            index = ast.policy.index(old_rule)
+            if index in old_rules_index:
+                return False
+            old_rules_index.append(index)
 
         if "p_priority" in ast.tokens:
             priority_index = ast.tokens.index("p_priority")
-            for idx, old_rule, new_rule in zip(old_rules_index, old_rules, new_rules):
-                if old_rule[priority_index] == new_rule[priority_index]:
-                    ast.policy[idx] = new_rule
-                else:
+            for old_rule, new_rule in zip(old_rules, new_rules):
+                if old_rule[priority_index] != new_rule[priority_index]:
                     raise Exception("New rule should have the same priority with old rule.")
-        else:
-            for idx, old_rule, new_rule in zip(old_rules_index, old_rules, new_rules):
-                ast.policy[idx] = new_rule
+
+        for idx, new_rule in zip(old_rules_index, new_rules):
+            ast.policy[idx] = new_rule
 
         ast.policy_version += 1
         return True

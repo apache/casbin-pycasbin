@@ -176,6 +176,32 @@ class TestPolicy(TestCase):
         for new_rule in new_rules:
             self.assertTrue(m.has_policy("p", "p", new_rule))
 
+    def test_update_policies_reusing_old_rules(self):
+        m = Model()
+        m.load_model(get_examples("basic_model.conf"))
+        rule_a = ["alice", "data1", "read"]
+        rule_b = ["bob", "data2", "write"]
+        m.add_policies("p", "p", [rule_a, rule_b])
+
+        self.assertTrue(m.update_policies("p", "p", [rule_a, rule_b], [rule_b, rule_a]))
+        self.assertEqual(m.get_policy("p", "p"), [rule_b, rule_a])
+
+        self.assertFalse(m.update_policies("p", "p", [rule_a, rule_a], [["x", "y", "z"], ["u", "v", "w"]]))
+        self.assertEqual(m.get_policy("p", "p"), [rule_b, rule_a])
+
+        m = Model()
+        m.load_model(get_examples("priority_model_explicit.conf"))
+        old_rules = [["1", "admin", "data1", "read", "allow"], ["1", "admin", "data2", "read", "allow"]]
+        m.add_policies("p", "p", old_rules)
+        with self.assertRaises(Exception):
+            m.update_policies(
+                "p",
+                "p",
+                old_rules,
+                [["1", "admin", "data3", "read", "allow"], ["2", "admin", "data4", "read", "allow"]],
+            )
+        self.assertEqual(m.get_policy("p", "p"), old_rules)
+
     def test_add_policies_bulk(self):
         m = Model()
         m.load_model(get_examples("basic_model.conf"))
