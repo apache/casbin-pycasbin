@@ -30,6 +30,28 @@ KEY_MATCH5_PATTERN = re.compile(r"{[^/]+}")
 WILDCARD_PATTERN = re.compile(r"\.\*|\[\^\\?/\]\+|\.|[^\\^$.|?*+()\[\]{}]")
 
 
+def _token_group_name(i):
+    return "casbinToken" + str(i)
+
+
+def _token_group(i, expr):
+    """returns the named capture group that stands in for the i-th pattern variable,
+    so that its value is found by name even when the pattern has capture groups of its own."""
+    return "(?P<" + _token_group_name(i) + ">" + expr + ")"
+
+
+def _replace_tokens(pattern, key2, expr):
+    """replaces every match of pattern in key2 with a numbered token group around expr."""
+    count = [0]
+
+    def repl(matchobj):
+        group = _token_group(count[0], expr)
+        count[0] += 1
+        return matchobj.group(1) + group + matchobj.group(2)
+
+    return pattern.sub(repl, key2)
+
+
 def _any_char(c):
     return c != "\n"
 
@@ -161,7 +183,7 @@ def key_get2(key1, key2, path_var):
     key2 = key2.replace("/*", "/.*")
 
     keys = re.findall(":[^/]+", key2)
-    key2 = KEY_MATCH2_PATTERN.sub(r"\g<1>([^\/]+)\g<2>", key2, 0)
+    key2 = _replace_tokens(KEY_MATCH2_PATTERN, key2, "[^/]+")
 
     if key2 == "*":
         key2 = "(.*)"
@@ -172,7 +194,7 @@ def key_get2(key1, key2, path_var):
         return ""
     for i, key in enumerate(keys):
         if path_var == key[1:]:
-            return values.groups()[i]
+            return values.group(_token_group_name(i))
     return ""
 
 
@@ -203,7 +225,7 @@ def key_get3(key1, key2, path_var):
     key2 = key2.replace("/*", "/.*")
 
     keys = re.findall(r"{[^/]+?}", key2)
-    key2 = KEY_MATCH3_PATTERN.sub(r"\g<1>([^/]+?)\g<2>", key2, 0)
+    key2 = _replace_tokens(KEY_MATCH3_PATTERN, key2, "[^/]+?")
 
     if key2 == "*":
         key2 = "(.*)"
@@ -214,7 +236,7 @@ def key_get3(key1, key2, path_var):
         return ""
     for i, key in enumerate(keys):
         if path_var == key[1 : len(key) - 1]:
-            return values.groups()[i]
+            return values.group(_token_group_name(i))
     return ""
 
 
@@ -231,8 +253,9 @@ def key_match4(key1: str, key2: str) -> bool:
     tokens: [str] = []
 
     def repl(matchobj):
+        group = _token_group(len(tokens), "[^/]+")
         tokens.append(matchobj.group(1))
-        return "([^/]+)"
+        return group
 
     key2 = KEY_MATCH4_PATTERN.sub(repl, key2)
 
@@ -241,13 +264,11 @@ def key_match4(key1: str, key2: str) -> bool:
 
     if matches is None:
         return False
-    if len(tokens) != len(matches.groups()):
-        raise Exception("KeyMatch4: number of tokens is not equal to number of values")
 
     tokens_matches = dict()
 
     for i in range(len(tokens)):
-        token, match = tokens[i], matches.groups()[i]
+        token, match = tokens[i], matches.group(_token_group_name(i))
 
         if token not in tokens_matches.keys():
             tokens_matches[token] = match

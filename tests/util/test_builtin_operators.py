@@ -118,6 +118,11 @@ class TestBuiltinOperators(TestCase):
 
         self.assertEqual(util.key_get2("/alice/all", "/:/all", ""), "")
 
+        # capture groups of the pattern's own must not shift which value a token gets
+        self.assertEqual(util.key_get2("/a/x/42", "/(a|b)/x/:id", "id"), "42")
+        self.assertEqual(util.key_get2("/42/a", "/:id/(a|b)", "id"), "42")
+        self.assertEqual(util.key_get2("/b/7/c/9", "/(a|b)/:x/(c|d)/:y", "y"), "9")
+
     def test_key_match3(self):
         self.assertTrue(util.key_match3_func("/foo", "/foo"))
         self.assertTrue(util.key_match3_func("/foo", "/foo*"))
@@ -188,6 +193,11 @@ class TestBuiltinOperators(TestCase):
             "project1",
         )
 
+    def test_key_get3_with_capture_groups(self):
+        self.assertEqual(util.key_get3("/a/x/42", "/(a|b)/x/{id}", "id"), "42")
+        self.assertEqual(util.key_get3("/42/a", "/{id}/(a|b)", "id"), "42")
+        self.assertEqual(util.key_get3("/b/7/c/9", "/(a|b)/{x}/(c|d)/{y}", "y"), "9")
+
     def test_key_match4(self):
         self.assertTrue(util.key_match4_func("/parent/123/child/123", "/parent/{id}/child/{id}"))
         self.assertFalse(util.key_match4_func("/parent/123/child/456", "/parent/{id}/child/{id}"))
@@ -202,6 +212,11 @@ class TestBuiltinOperators(TestCase):
         self.assertFalse(util.key_match4_func("/parent/123/child/456", "/parent/{id}/child/{id}/book/{id}"))
 
         self.assertFalse(util.key_match4_func("/parent/123/child/123", "/parent/{i/d}/child/{i/d}"))
+
+        self.assertTrue(util.key_match4_func("/a/123/child/123", "/(a|b)/{id}/child/{id}"))
+        self.assertFalse(util.key_match4_func("/a/123/child/456", "/(a|b)/{id}/child/{id}"))
+        self.assertFalse(util.key_match4_func("/c/123/child/123", "/(a|b)/{id}/child/{id}"))
+        self.assertTrue(util.key_match4_func("/123/x/123", "/{id}/(x|y)/{id}"))
 
     def test_key_match5_func(self):
         self.assertTrue(util.key_match5_func("/parent/child?status=1&type=2", "/parent/child"))
