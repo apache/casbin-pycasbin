@@ -417,3 +417,48 @@ class TestDomainManager(TestRoleManager):
         rm.add_link("dave", "admin", "domain2")
         rm.add_domain_link_condition_func("dave", "admin", "domain2", deny)
         self.assertNotIn("dave", rm.rm_map["domain1"].all_roles)
+
+    def test_domain_pattern_delete_link(self):
+        rm = default_role_manager.DomainManager(10)
+        rm.add_domain_matching_func(key_match)
+
+        rm.add_link("alice", "admin", "*")
+        rm.add_link("alice", "admin", "domain1")
+        self.assertTrue(rm.has_link("alice", "admin", "domain1"))
+        rm.delete_link("alice", "admin", "domain1")
+        self.assertTrue(rm.has_link("alice", "admin", "domain1"))
+
+        rm.add_link("bob", "admin", "domain2")
+        self.assertTrue(rm.has_link("bob", "admin", "domain2"))
+        rm.add_link("bob", "admin", "*")
+        rm.delete_link("bob", "admin", "*")
+        self.assertTrue(rm.has_link("bob", "admin", "domain2"))
+        self.assertFalse(rm.has_link("bob", "admin", "domain1"))
+
+        rm.add_link("carol", "admin", "domain3")
+        rm.add_domain_matching_func(key_match)
+        rm.delete_link("alice", "admin", "*")
+        self.assertFalse(rm.has_link("alice", "admin", "domain1"))
+        self.assertFalse(rm.has_link("alice", "admin", "domain3"))
+        self.assertTrue(rm.has_link("bob", "admin", "domain2"))
+        self.assertTrue(rm.has_link("carol", "admin", "domain3"))
+
+        rm.delete_link("bob", "admin", "domain2")
+        self.assertFalse(rm.has_link("bob", "admin", "domain2"))
+
+    def test_conditional_domain_pattern_delete_link(self):
+        rm = default_role_manager.ConditionalDomainManager(10)
+        rm.add_domain_matching_func(key_match)
+
+        rm.add_link("alice", "admin", "*")
+        rm.add_link("alice", "admin", "domain1")
+        rm.delete_link("alice", "admin", "domain1")
+        rm.add_link("bob", "admin", "domain2")
+        rm.add_link("bob", "admin", "*")
+        rm.delete_link("bob", "admin", "*")
+        rm.add_domain_matching_func(key_match)
+
+        self.assertTrue(rm.has_link("alice", "admin", "domain1"))
+        self.assertTrue(rm.has_link("alice", "admin", "domain2"))
+        self.assertTrue(rm.has_link("bob", "admin", "domain2"))
+        self.assertFalse(rm.has_link("bob", "admin", "domain1"))

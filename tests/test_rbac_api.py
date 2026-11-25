@@ -504,6 +504,24 @@ class TestRbacApi(TestCaseBase):
         self.assertTrue(e.enforce("bob", "domain2", "data2", "read"))
         self.assertTrue(e.enforce("bob", "domain2", "data2", "write"))
 
+    def test_remove_grouping_policy_with_domain_pattern(self):
+        e = self.get_enforcer(
+            get_examples("rbac_with_domain_pattern_model.conf"),
+            get_examples("rbac_with_domain_pattern_policy.csv"),
+        )
+        e.add_named_domain_matching_func("g", casbin.util.key_match)
+        self.assertTrue(e.enforce("alice", "domain1", "data1", "read"))
+        self.assertTrue(e.enforce("bob", "domain2", "data2", "read"))
+
+        e.add_grouping_policy("alice", "admin", "domain1")
+        e.remove_grouping_policy("alice", "admin", "domain1")
+        e.add_grouping_policy("bob", "admin", "*")
+        e.remove_grouping_policy("bob", "admin", "*")
+
+        self.assertTrue(e.enforce("alice", "domain1", "data1", "read"))
+        self.assertTrue(e.enforce("bob", "domain2", "data2", "read"))
+        self.assertFalse(e.enforce("bob", "domain1", "data1", "read"))
+
     def test_set_field_index(self):
         e = self.get_enforcer(
             get_examples("rbac_with_domains_model.conf"),

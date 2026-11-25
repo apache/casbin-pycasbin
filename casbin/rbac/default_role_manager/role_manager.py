@@ -112,13 +112,13 @@ class RoleManager(RM):
         self.max_hierarchy_level = max_hierarchy_level
         self.matching_func = None
         self.domain_matching_func = None
-        self.all_links = list()
+        self.all_links = dict()
         self.all_roles = dict()
 
     def _rebuild(self):
         self.all_roles = dict()
         links = self.all_links
-        self.all_links = list()
+        self.all_links = dict()
         for link in links:
             self.add_link(link.user, link.role)
 
@@ -159,10 +159,10 @@ class RoleManager(RM):
 
     def clear(self):
         self.all_roles = dict()
-        self.all_links = list()
+        self.all_links = dict()
 
     def add_link(self, name1, name2, *domain):
-        self.all_links.append(Link(name1, name2))
+        self.all_links[Link(name1, name2)] = None
 
         user = self._get_role(name1)
         role = self._get_role(name2)
@@ -179,7 +179,7 @@ class RoleManager(RM):
     def delete_link(self, name1, name2, *domain):
         if Link(name1, name2) not in self.all_links:
             return
-        self.all_links.remove(Link(name1, name2))
+        del self.all_links[Link(name1, name2)]
 
         user = self._get_role(name1)
         role = self._get_role(name2)
@@ -259,18 +259,33 @@ class DomainManagerBase(RM):
         domain = self._get_domain(*domain)
 
         if domain not in self.all_links:
-            self.all_links[domain] = []
+            self.all_links[domain] = dict()
 
         return self.all_links[domain]
 
+    def _domain_match(self, domain, pattern):
+        if domain == pattern:
+            return True
+        if self.domain_matching_func is None:
+            return False
+        return match_error_handler(self.domain_matching_func, domain, pattern)
+
+    def _grant_domains(self, name1, name2):
+        """returns the domains in which the link between name1 and name2 is still added."""
+        link = Link(name1, name2)
+        return [domain for domain, links in self.all_links.items() if link in links]
+
+    def _link_granted(self, domain, grant_domains):
+        return any(self._domain_match(domain, grant_domain) for grant_domain in grant_domains)
+
     def _get_role_manager(self, *domain):
         domain1 = self._get_domain(*domain)
-        domain_links = self.all_links.get(domain1, [])
+        domain_links = list(self.all_links.get(domain1, {}))
 
         if self.domain_matching_func != None:
             for domain2, links in self.all_links.items():
                 if domain1 != domain2 and match_error_handler(self.domain_matching_func, domain1, domain2):
-                    domain_links = domain_links + links
+                    domain_links = domain_links + list(links)
 
         rm = RoleManager(max_hierarchy_level=self.max_hierarchy_level)
         rm.add_matching_func(self.matching_func)
@@ -283,13 +298,13 @@ class DomainManagerBase(RM):
 
     def add_link(self, name1, name2, *domain):
         links = self._get_links(*domain)
-        links.append(Link(name1, name2))
+        links[Link(name1, name2)] = None
 
     def delete_link(self, name1, name2, *domain):
         links = self._get_links(*domain)
         if Link(name1, name2) not in links:
             raise RuntimeError(f"error: link between {name1} and {name2} does not exist")
-        links.remove(Link(name1, name2))
+        del links[Link(name1, name2)]
 
     def has_link(self, name1, name2, *domain):
         rm = self._get_role_manager(*domain)
@@ -342,12 +357,12 @@ class DomainManager(DomainManagerBase):
 
         if self.domain_matching_func != None:
             return [
-                self.rm_map[domain_str]
-                for domain_str in self.rm_map.keys()
-                if match_error_handler(self.domain_matching_func, domain_str, domain_pattern)
+                (domain_str, rm)
+                for domain_str, rm in list(self.rm_map.items())
+                if self._domain_match(domain_str, domain_pattern)
             ]
         else:
-            return [self.rm_map[domain_pattern]] if domain_pattern in self.rm_map else []
+            return [(domain_pattern, self.rm_map[domain_pattern])] if domain_pattern in self.rm_map else []
 
     def add_matching_func(self, fn):
         super().add_matching_func(fn)
@@ -366,13 +381,15 @@ class DomainManager(DomainManagerBase):
 
     def add_link(self, name1, name2, *domain):
         super().add_link(name1, name2, *domain)
-        for rm in self._affected_role_managers(*domain):
+        for _, rm in self._affected_role_managers(*domain):
             rm.add_link(name1, name2, *domain)
 
     def delete_link(self, name1, name2, *domain):
         super().delete_link(name1, name2, *domain)
-        for rm in self._affected_role_managers(*domain):
-            rm.delete_link(name1, name2, *domain)
+        grant_domains = self._grant_domains(name1, name2)
+        for domain2, rm in self._affected_role_managers(*domain):
+            if not self._link_granted(domain2, grant_domains):
+                rm.delete_link(name1, name2, *domain)
 
     def has_link(self, name1, name2, *domain):
         return super().has_link(name1, name2, *domain)
@@ -581,9 +598,7 @@ class ConditionalDomainManager(DomainManager, ConditionalRoleManager):
 
     def add_link(self, name1, name2, *domain):
         domain = self._get_domain(*domain)
-        links = self._get_links(domain)
-        if Link(name1, name2) not in links:
-            links.append(Link(name1, name2))
+        self._get_links(domain)[Link(name1, name2)] = None
         rm = self._get_conditional_role_manager(domain, store=True)
         rm.add_link(name1, name2, domain)
 
@@ -595,14 +610,15 @@ class ConditionalDomainManager(DomainManager, ConditionalRoleManager):
 
     def delete_link(self, name1, name2, *domain):
         domain = self._get_domain(*domain)
-        links = self.all_links.get(domain)
-        if links is not None and Link(name1, name2) in links:
-            links.remove(Link(name1, name2))
+        self.all_links.get(domain, {}).pop(Link(name1, name2), None)
+        grant_domains = self._grant_domains(name1, name2)
         rm = self._get_conditional_role_manager(domain, store=True)
-        rm.delete_link(name1, name2, domain)
+        if not self._link_granted(domain, grant_domains):
+            rm.delete_link(name1, name2, domain)
 
-        for _, rm2 in self._affected_conditional_role_managers(domain):
-            rm2.delete_link(name1, name2, domain)
+        for domain2, rm2 in self._affected_conditional_role_managers(domain):
+            if not self._link_granted(domain2, grant_domains):
+                rm2.delete_link(name1, name2, domain)
 
     def add_link_condition_func(self, user_name, role_name, fn):
         for rm in self.rm_map.values():
