@@ -767,6 +767,24 @@ class CoreEnforcer:
     @staticmethod
     @lru_cache(maxsize=8192)
     def _normalize_expression(expr):
+        """rewrites &&, || and ! as Python operators, keeping quoted string literals as they are."""
+        res = []
+        start = 0
+        i = 0
+        while i < len(expr):
+            if expr[i] not in "\"'":
+                i += 1
+                continue
+            end = util.string_literal_end(expr, i)
+            res.append(CoreEnforcer._normalize_operators(expr[start:i]))
+            res.append(expr[i:end])
+            start = end
+            i = end
+        res.append(CoreEnforcer._normalize_operators(expr[start:]))
+        return "".join(res)
+
+    @staticmethod
+    def _normalize_operators(expr):
         expr = expr.replace("&&", "and")
         expr = expr.replace("||", "or")
         return re.sub(r"!(?!=)", "not ", expr)

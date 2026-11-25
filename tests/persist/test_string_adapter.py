@@ -76,6 +76,32 @@ m = r.sub == p.sub && (r.act == "#write" || r.obj == 'a;b') # comment
         self.assertTrue(e.enforce("alice", "a;b", "read"))
         self.assertFalse(e.enforce("alice", "data1", "read"))
 
+    def test_operators_in_matcher_string(self):
+        conf = """
+[request_definition]
+r = sub, obj, act
+
+[policy_definition]
+p = sub, obj, act
+
+[policy_effect]
+e = some(where (p.eft == allow))
+
+[matchers]
+m = r.sub == p.sub && (r.obj == "a&&b||c" || r.act == 'hi!' || r.act == "x\\"!") && !(r.obj == "deny")
+"""
+        model = Model()
+        model.load_model_from_text(conf)
+        e = self.get_enforcer(model, StringAdapter("p, alice, data1, read"))
+
+        self.assertTrue(e.enforce("alice", "a&&b||c", "read"))
+        self.assertFalse(e.enforce("alice", "a and b or c", "read"))
+        self.assertTrue(e.enforce("alice", "data1", "hi!"))
+        self.assertFalse(e.enforce("alice", "data1", "hinot "))
+        self.assertTrue(e.enforce("alice", "data1", 'x"!'))
+        self.assertFalse(e.enforce("alice", "deny", "hi!"))
+        self.assertFalse(e.enforce("bob", "a&&b||c", "read"))
+
     def test_string_rbac(self):
         conf = """
 [request_definition]
