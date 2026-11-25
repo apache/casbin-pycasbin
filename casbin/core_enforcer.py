@@ -190,6 +190,56 @@ class CoreEnforcer:
         """gets the current role manager."""
         return self.rm_map["g"]
 
+    def _implicit_users_for_resource_by_domain(self, resource, domain, subject_index, object_index, dom_index):
+        if subject_index == -1 or object_index == -1 or dom_index == -1:
+            raise ValueError("the policy definition should have sub, obj and dom fields")
+        rm = self.get_role_manager()
+
+        def match_domain(pattern):
+            if domain == pattern:
+                return True
+            domain_matching_func = getattr(rm, "domain_matching_func", None)
+            if domain_matching_func is None:
+                return False
+            try:
+                return bool(domain_matching_func(domain, pattern))
+            except Exception:
+                return False
+
+        def get_implicit_users(name):
+            users = []
+            visited = {name}
+            queue = [name]
+            while queue:
+                for user in rm.get_users(queue.pop(0), domain):
+                    if user not in visited:
+                        visited.add(user)
+                        users.append(user)
+                        queue.append(user)
+            return users
+
+        permissions = dict()
+        for rule in self.get_policy():
+            if rule[object_index] != resource or not match_domain(rule[dom_index]):
+                continue
+
+            users = get_implicit_users(rule[subject_index])
+            if len(users) == 0:
+                direct_rule = list(rule)
+                direct_rule[dom_index] = domain
+                permissions[tuple(direct_rule)] = True
+                continue
+
+            for user in users:
+                if len(rm.get_users(user, domain)) > 0:
+                    continue
+                implicit_rule = list(rule)
+                implicit_rule[subject_index] = user
+                implicit_rule[dom_index] = domain
+                permissions[tuple(implicit_rule)] = True
+
+        return [list(key) for key in permissions.keys()]
+
     def get_named_role_manager(self, ptype):
         if ptype in self.rm_map.keys():
             return self.rm_map.get(ptype)

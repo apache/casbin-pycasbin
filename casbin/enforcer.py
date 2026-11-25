@@ -315,29 +315,10 @@ class Enforcer(ManagementEnforcer):
     def get_implicit_users_for_resource_by_domain(self, resource, domain):
         """get implicit user based on resource and domain.
         Compared to GetImplicitUsersForResource, domain is supported"""
-        permissions = dict()
         subject_index = self.get_field_index("p", "sub")
         object_index = self.get_field_index("p", "obj")
         dom_index = self.get_field_index("p", "dom")
-        rm = self.get_role_manager()
-        roles = self.get_all_roles_by_domain(domain)
-
-        for rule in self.get_policy():
-            if rule[object_index] == resource:
-                sub = rule[subject_index]
-                if sub not in roles:
-                    permissions[tuple(rule)] = True
-                else:
-                    if domain != rule[dom_index]:
-                        continue
-                    users = rm.get_users(sub, domain)
-                    for user in users:
-                        implicit_rule = rule.copy()
-                        implicit_rule[subject_index] = user
-                        permissions[tuple(implicit_rule)] = True
-
-        permissions = [list(t) for t in (list(key) for key in permissions.keys())]
-        return permissions
+        return self._implicit_users_for_resource_by_domain(resource, domain, subject_index, object_index, dom_index)
 
     def get_allowed_object_conditions(self, user, action, prefix):
         """

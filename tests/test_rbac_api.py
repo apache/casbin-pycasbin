@@ -486,6 +486,48 @@ class TestRbacApi(TestCaseBase):
             e.get_implicit_users_for_resource_by_domain("data2", "domain2"),
         )
 
+        e.add_policy("carol", "domain2", "data1", "read")
+        e.add_policy("manager", "domain2", "data1", "write")
+        e.add_grouping_policy("dave", "manager", "domain2")
+        self.assertEqual(
+            [["alice", "domain1", "data1", "read"], ["alice", "domain1", "data1", "write"]],
+            e.get_implicit_users_for_resource_by_domain("data1", "domain1"),
+        )
+        self.assertEqual(
+            [["carol", "domain2", "data1", "read"], ["dave", "domain2", "data1", "write"]],
+            e.get_implicit_users_for_resource_by_domain("data1", "domain2"),
+        )
+
+        e.add_grouping_policy("leader", "manager", "domain2")
+        e.add_grouping_policy("erin", "leader", "domain2")
+        self.assertEqual(
+            [
+                ["carol", "domain2", "data1", "read"],
+                ["dave", "domain2", "data1", "write"],
+                ["erin", "domain2", "data1", "write"],
+            ],
+            sorted(e.get_implicit_users_for_resource_by_domain("data1", "domain2")),
+        )
+
+        e = self.get_enforcer(
+            get_examples("rbac_with_domain_pattern_model.conf"),
+            get_examples("rbac_with_domain_pattern_policy.csv"),
+        )
+        e.add_named_domain_matching_func("g", casbin.util.key_match)
+        e.add_policy("admin", "*", "data3", "read")
+        self.assertEqual(
+            [["alice", "domain1", "data1", "read"], ["alice", "domain1", "data1", "write"]],
+            e.get_implicit_users_for_resource_by_domain("data1", "domain1"),
+        )
+        self.assertEqual(
+            [["alice", "domain2", "data3", "read"], ["bob", "domain2", "data3", "read"]],
+            sorted(e.get_implicit_users_for_resource_by_domain("data3", "domain2")),
+        )
+
+        e = self.get_enforcer(get_examples("rbac_model.conf"), get_examples("rbac_policy.csv"))
+        with self.assertRaises(ValueError):
+            e.get_implicit_users_for_resource_by_domain("data1", "domain1")
+
     def test_domain_match_model(self):
         e = self.get_enforcer(
             get_examples("rbac_with_domain_pattern_model.conf"),
