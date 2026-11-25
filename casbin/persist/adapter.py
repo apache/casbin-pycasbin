@@ -114,6 +114,8 @@ def load_policy_line(line, model):
         return
 
     key = tokens[0]
+    if key == "":
+        raise ValueError("invalid policy rule %r: missing policy type" % line)
     sec = key[0]
 
     if sec not in model.model.keys():

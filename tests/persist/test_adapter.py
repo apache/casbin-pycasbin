@@ -19,7 +19,7 @@ import os
 import tempfile
 
 import casbin
-from casbin.persist.adapter import _extract_tokens, policy_line_to_csv
+from casbin.persist.adapter import _extract_tokens, load_policy_line, policy_line_to_csv
 from tests import TestCaseBase
 
 EXAMPLES = os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "..", "examples")
@@ -135,3 +135,13 @@ class TestQuotedPolicyFile(TestCaseBase):
             e.save_policy()
         with open(path) as f:
             self.assertNotIn("mallory", f.read())
+
+    def test_load_policy_line_without_policy_type(self):
+        e = casbin.Enforcer(os.path.join(EXAMPLES, "basic_model.conf"))
+        for line in [", alice, data1, read", '"", alice', " , "]:
+            with self.assertRaisesRegex(ValueError, "missing policy type"):
+                load_policy_line(line, e.get_model())
+        self.assertEqual(e.get_policy(), [])
+
+        load_policy_line("p, alice, data1, read", e.get_model())
+        self.assertEqual(e.get_policy(), [["alice", "data1", "read"]])
