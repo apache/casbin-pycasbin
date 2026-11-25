@@ -16,6 +16,7 @@
 # under the License.
 
 import math
+import threading
 
 from casbin.cache import DefaultCache
 from casbin.enforcer import Enforcer
@@ -41,6 +42,9 @@ class CacheSupport:
         # these have to exist before the enforcer constructor runs: it may load a policy,
         # and the load path invalidates the cache.
         self._cache = DefaultCache()
+        self._cache_lock = threading.Lock()
+        self._cache_epoch = 0
+        self._cache_version = None
         self._enable_cache = True
         self._expire_time = None
         self._warned_about_dynamic_model = False
@@ -69,7 +73,37 @@ class CacheSupport:
 
     def invalidate_cache(self):
         """drops every cached decision."""
-        self._cache.clear()
+        with self._cache_lock:
+            self._cache_epoch += 1
+            self._cache.clear()
+
+    def _policy_version(self):
+        """identifies the policy that decisions are cached for. It changes whenever the
+        cache is invalidated or a policy rule of the model is added, updated or removed."""
+        version = [self._cache_epoch, id(self.model)]
+        for sec in ("p", "g"):
+            assertions = self.model[sec] if sec in self.model.keys() else None
+            if assertions:
+                for ptype, assertion in assertions.items():
+                    version.append((sec, ptype, assertion.policy_version))
+        return tuple(version)
+
+    def _sync_cache_version(self):
+        """drops the cached decisions when the policy changed since they were cached,
+        and returns the current policy version."""
+        version = self._policy_version()
+        if version != self._cache_version:
+            with self._cache_lock:
+                if version == self._policy_version():
+                    self._cache.clear()
+                    self._cache_version = version
+        return version
+
+    def _set_cached_result(self, version, key, value):
+        """caches a decision unless the policy changed while it was being made."""
+        with self._cache_lock:
+            if version == self._cache_version and version == self._policy_version():
+                self._cache.set(key, value, self._expire_time)
 
     @staticmethod
     def get_cache_key(*rvals):
@@ -136,6 +170,7 @@ class CacheSupport:
         if key is None:
             return super().enforce_ex(*rvals)
 
+        version = self._sync_cache_version()
         cached = self._cache.get(key, _MISSING)
         if cached is not _MISSING:
             result, explain = cached
@@ -143,7 +178,7 @@ class CacheSupport:
             return result, list(explain)
 
         result, explain = super().enforce_ex(*rvals)
-        self._cache.set(key, (result, tuple(explain)), self._expire_time)
+        self._set_cached_result(version, key, (result, tuple(explain)))
         return result, explain
 
     # Everything below invalidates the cache after letting the enforcer do its work.
@@ -262,10 +297,11 @@ class CachedEnforcer(CacheSupport, Enforcer):
     """Enforcer that caches enforce() decisions.
 
     The cache is keyed on the request alone, so it is only correct as long as every change
-    that could alter a decision drops it. Policy changes made through this enforcer do
-    that automatically. Changes made behind its back -- a second process writing to the
-    same database, or code reaching into ``e.model`` directly -- do not, so pair those with
-    a call to invalidate_cache() or set_expire_time().
+    that could alter a decision drops it. Policy changes made through this enforcer, or
+    to the policy rules of ``e.model``, do that automatically; a decision made while the
+    policy changed is not cached. Changes made behind its back -- a second process writing
+    to the same database -- do not, so pair those with a call to invalidate_cache() or
+    set_expire_time().
     """
 
     def load_policy(self):

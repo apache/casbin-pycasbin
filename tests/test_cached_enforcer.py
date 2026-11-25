@@ -522,6 +522,29 @@ class TestCacheInvalidation(TestCase):
         e.build_role_links()
         self.assertTrue(e.enforce("alice", "/book/1", "GET"))
 
+    def test_policy_change_during_enforce_is_not_cached(self):
+        e = self.get_enforcer("basic_model.conf", "basic_policy.csv")
+        e.enable_auto_save(False)
+        state = {"changed": False}
+
+        def change_policy_once(*args):
+            if not state["changed"]:
+                state["changed"] = True
+                e.remove_policy("alice", "data1", "read")
+            return True
+
+        e.add_function("changePolicyOnce", change_policy_once)
+        e.get_model()["m"]["m"].value += " && changePolicyOnce()"
+
+        self.assertTrue(e.enforce("alice", "data1", "read"))
+        self.assertFalse(e.enforce("alice", "data1", "read"))
+
+    def test_direct_model_change_is_not_served_from_cache(self):
+        e = self.get_enforcer("basic_model.conf", "basic_policy.csv")
+        self.assertTrue(e.enforce("alice", "data1", "read"))
+        e.get_model().remove_policy("p", "p", ["alice", "data1", "read"])
+        self.assertFalse(e.enforce("alice", "data1", "read"))
+
     def test_invalidate_cache(self):
         e = self.get_enforcer("basic_model.conf", "basic_policy.csv")
         e.enforce("alice", "data1", "read")
