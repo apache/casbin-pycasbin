@@ -22,6 +22,18 @@ eval_reg = re.compile(r"\beval\((?P<rule>[^)]*)\)")
 escape_assertion_reg = re.compile(r"\b([rp]\d*)\.")
 
 
+def string_literal_end(s, i):
+    """returns the index just past the string literal that opens at s[i],
+    or len(s) when the literal is not closed."""
+    quote = s[i]
+    end = i + 1
+    while end < len(s) and s[end] != quote:
+        if s[end] == "\\":
+            end += 1
+        end += 1
+    return min(end + 1, len(s))
+
+
 def escape_assertion(s):
     """escapes the dots in the assertion, because the expression evaluation doesn't support such variable names.
     Quoted string literals are kept as they are."""
@@ -33,12 +45,7 @@ def escape_assertion(s):
         if quote not in "\"'":
             i += 1
             continue
-        end = i + 1
-        while end < len(s) and s[end] != quote:
-            if s[end] == "\\":
-                end += 1
-            end += 1
-        end = min(end + 1, len(s))
+        end = string_literal_end(s, i)
         res.append(escape_assertion_reg.sub(r"\1_", s[start:i]))
         res.append(s[i:end])
         start = end
@@ -48,13 +55,19 @@ def escape_assertion(s):
 
 
 def remove_comments(s):
-    """removes the comments starting with # in the text."""
+    """removes the comments starting with # in the text.
+    A # inside a quoted string literal is part of the literal."""
 
-    pos = s.find("#")
-    if pos == -1:
-        return s
+    i = 0
+    while i < len(s):
+        if s[i] == "#":
+            return s[0:i].strip()
+        if s[i] in "\"'":
+            i = string_literal_end(s, i)
+        else:
+            i += 1
 
-    return s[0:pos].strip()
+    return s
 
 
 def array_remove_duplicates(s):

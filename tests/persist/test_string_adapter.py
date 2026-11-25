@@ -54,6 +54,28 @@ g, alice, data_group_admin
         act = "POST"
         self.assertTrue(e.enforce(sub, obj, act))
 
+    def test_comment_marker_in_matcher_string(self):
+        conf = """
+[request_definition]
+r = sub, obj, act
+
+[policy_definition]
+p = sub, obj, act
+
+[policy_effect]
+e = some(where (p.eft == allow))
+
+[matchers]
+m = r.sub == p.sub && (r.act == "#write" || r.obj == 'a;b') # comment
+"""
+        model = Model()
+        model.load_model_from_text(conf)
+        e = self.get_enforcer(model, StringAdapter("p, alice, data1, read"))
+
+        self.assertTrue(e.enforce("alice", "data1", "#write"))
+        self.assertTrue(e.enforce("alice", "a;b", "read"))
+        self.assertFalse(e.enforce("alice", "data1", "read"))
+
     def test_string_rbac(self):
         conf = """
 [request_definition]

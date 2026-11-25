@@ -35,6 +35,7 @@ class TestConfig(TestCase):
         self.assertEqual(config.get("redis::redis.key"), "push1,push2")
         self.assertEqual(config.get("mysql::mysql.dev.host"), "127.0.0.1")
         self.assertEqual(config.get("mysql::mysql.master.host"), "10.0.0.1")
+        self.assertEqual(config.get("mysql::mysql.master.note"), "\"a#b;c\" 'd#e'")
 
         # math::key test
         self.assertEqual(config.get("math::math.i64"), "64")

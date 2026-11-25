@@ -26,6 +26,12 @@ class TestUtil(TestCase):
         self.assertEqual(util.remove_comments("r.act == p.act###"), "r.act == p.act")
         self.assertEqual(util.remove_comments("### comments"), "")
         self.assertEqual(util.remove_comments("r.act == p.act"), "r.act == p.act")
+        self.assertEqual(
+            util.remove_comments('r.act == "#write" && r.sub == p.sub'), 'r.act == "#write" && r.sub == p.sub'
+        )
+        self.assertEqual(util.remove_comments("r.act == '#write' # it's a comment"), "r.act == '#write'")
+        self.assertEqual(util.remove_comments('r.act == "a\\"#b" # comments'), 'r.act == "a\\"#b"')
+        self.assertEqual(util.remove_comments('r.act == "#write'), 'r.act == "#write')
 
     def test_escape_assertion(self):
         self.assertEqual(

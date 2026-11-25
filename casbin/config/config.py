@@ -17,6 +17,8 @@
 
 from io import StringIO
 
+from casbin.util.util import string_literal_end
+
 
 class Config:
     """represents an implementation of the ConfigInterface"""
@@ -97,11 +99,17 @@ class Config:
                     p = line
                     can_write = True
 
+                # a comment marker inside a quoted string is part of the value
                 end = len(p)
-                for i, value in enumerate(p):
-                    if value == self.DEFAULT_COMMENT or value == self.DEFAULT_COMMENT_SEM:
+                i = 0
+                while i < len(p):
+                    if p[i] in "\"'":
+                        i = string_literal_end(p, i)
+                    elif p[i] == self.DEFAULT_COMMENT or p[i] == self.DEFAULT_COMMENT_SEM:
                         end = i
                         break
+                    else:
+                        i += 1
                 buf.append(p[:end])
 
     def _write(self, section, line_num, b):
