@@ -95,6 +95,14 @@ class Role:
         params = self.link_condition_func_params_map.get(key)
         return list(params) if params is not None else []
 
+    def copy_link_conditions(self, other, role_name=""):
+        for key, fn in list(other.link_condition_func_map.items()):
+            if role_name == "" or key[0] == role_name:
+                self.link_condition_func_map[key] = fn
+        for key, params in list(other.link_condition_func_params_map.items()):
+            if role_name == "" or key[0] == role_name:
+                self.link_condition_func_params_map[key] = params
+
 
 class RoleManager(RM):
     """provides a default implementation for the RoleManager interface"""
@@ -432,11 +440,42 @@ class ConditionalRoleManager(RoleManager, CRM):
             if link_condition_func is not None:
                 params = self.get_link_condition_func_params(current_role.name, next_role.name, domains)
                 pass_link_condition_func = link_condition_func(*params)
+            elif self.domain_matching_func is not None:
+                pass_link_condition_func = self._check_pattern_link_condition(
+                    current_role.name, next_role.name, domains[0]
+                )
 
         if pass_link_condition_func:
             next_roles.append(next_role)
 
         return next_roles
+
+    def _check_pattern_link_condition(self, name1, name2, domain):
+        """checks the conditions of the links inherited from the domain patterns matching domain."""
+        user = self.all_roles.get(name1)
+        if user is None:
+            return True
+
+        for key, fn in list(user.link_condition_func_map.items()):
+            role_name, domain_name = key
+            if (
+                role_name != name2
+                or domain_name == domain
+                or not match_error_handler(self.domain_matching_func, domain, domain_name)
+            ):
+                continue
+            params = user.link_condition_func_params_map.get(key)
+            if not fn(*(params if params is not None else [])):
+                return False
+
+        return True
+
+    def _copy_from(self, other):
+        for link in list(dict.fromkeys(other.all_links)):
+            self.add_link(link.user, link.role)
+            src = other.all_roles.get(link.user)
+            if src is not None:
+                self._get_role(link.user).copy_link_conditions(src, link.role)
 
     def get_link_condition_func(self, user_name, role_name):
         """get_link_condition_func get link_condition_func based on userName, roleName"""
@@ -486,31 +525,54 @@ class ConditionalRoleManager(RoleManager, CRM):
 
 class ConditionalDomainManager(DomainManager, ConditionalRoleManager):
     def _get_role_manager(self, *domain):
-        domain1 = self._get_domain(*domain)
-        if domain1 not in self.rm_map:
-            self.rm_map[domain1] = self._get_conditional_role_manager(*domain)
-
-        return self.rm_map[domain1]
+        return self._get_conditional_role_manager(*domain)
 
     def _get_conditional_role_manager(self, *domain, store=False):
         domain1 = self._get_domain(*domain)
-        domain_links = self.all_links.get(domain1, [])
-
         rm = self.rm_map.get(domain1, None)
 
         if rm is None:
             rm = ConditionalRoleManager(max_hierarchy_level=self.max_hierarchy_level)
+            rm.add_matching_func(self.matching_func)
+            rm.add_domain_matching_func(self.domain_matching_func)
             if store:
                 self.rm_map[domain1] = rm
             if self.domain_matching_func is not None:
-                for domain2, links in self.all_links.items():
+                for domain2, rm2 in list(self.rm_map.items()):
                     if domain1 != domain2 and match_error_handler(self.domain_matching_func, domain1, domain2):
-                        domain_links = domain_links + links
-
-            rm.add_matching_func(self.matching_func)
-            for link in domain_links:
-                rm.add_link(link[0], link[1])
+                        rm._copy_from(rm2)
         return rm
+
+    def _affected_conditional_role_managers(self, domain):
+        if self.domain_matching_func is None:
+            return []
+        return [
+            (domain2, rm)
+            for domain2, rm in list(self.rm_map.items())
+            if domain != domain2 and match_error_handler(self.domain_matching_func, domain2, domain)
+        ]
+
+    def _link_conditional_role_managers(self, domain):
+        """returns the role managers that check the links of domain: the role manager of domain
+        and those of the domains matched by domain as a pattern."""
+        rms = [self._get_conditional_role_manager(domain, store=True)]
+        rms.extend(rm for _, rm in self._affected_conditional_role_managers(domain))
+        return rms
+
+    def _rebuild(self):
+        rm_map = self.rm_map
+        links = self.all_links
+        self.all_links = dict()
+        self.rm_map = OrderedDict()
+        for domain, domain_links in links.items():
+            for link in domain_links:
+                self.add_link(link.user, link.role, domain)
+        for domain in rm_map:
+            self._get_conditional_role_manager(domain, store=True)
+        for domain, old_rm in rm_map.items():
+            for rm in self._link_conditional_role_managers(domain):
+                for name, src in list(old_rm.all_roles.items()):
+                    rm._get_role(name).copy_link_conditions(src)
 
     def has_link(self, name1, name2, *domain):
         domain = self._get_domain(*domain)
@@ -519,20 +581,35 @@ class ConditionalDomainManager(DomainManager, ConditionalRoleManager):
 
     def add_link(self, name1, name2, *domain):
         domain = self._get_domain(*domain)
+        links = self._get_links(domain)
+        if Link(name1, name2) not in links:
+            links.append(Link(name1, name2))
         rm = self._get_conditional_role_manager(domain, store=True)
         rm.add_link(name1, name2, domain)
 
+        src = rm.all_roles.get(name1)
+        for _, rm2 in self._affected_conditional_role_managers(domain):
+            rm2.add_link(name1, name2, domain)
+            if src is not None:
+                rm2._get_role(name1).copy_link_conditions(src, name2)
+
     def delete_link(self, name1, name2, *domain):
         domain = self._get_domain(*domain)
+        links = self.all_links.get(domain)
+        if links is not None and Link(name1, name2) in links:
+            links.remove(Link(name1, name2))
         rm = self._get_conditional_role_manager(domain, store=True)
         rm.delete_link(name1, name2, domain)
+
+        for _, rm2 in self._affected_conditional_role_managers(domain):
+            rm2.delete_link(name1, name2, domain)
 
     def add_link_condition_func(self, user_name, role_name, fn):
         for rm in self.rm_map.values():
             rm.add_link_condition_func(user_name, role_name, fn)
 
     def add_domain_link_condition_func(self, user_name, role_name, domain, fn):
-        for rm in self.rm_map.values():
+        for rm in self._link_conditional_role_managers(domain):
             rm.add_domain_link_condition_func(user_name, role_name, domain, fn)
 
     def set_link_condition_func_params(self, user_name, role_name, *params):
@@ -540,5 +617,5 @@ class ConditionalDomainManager(DomainManager, ConditionalRoleManager):
             rm.set_link_condition_func_params(user_name, role_name, *params)
 
     def set_domain_link_condition_func_params(self, user_name, role_name, domain, *params):
-        for rm in self.rm_map.values():
+        for rm in self._link_conditional_role_managers(domain):
             rm.set_domain_link_condition_func_params(user_name, role_name, domain, *params)

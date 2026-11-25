@@ -17,7 +17,7 @@
 
 from unittest import TestCase
 from casbin.rbac import default_role_manager
-from casbin.util import regex_match_func
+from casbin.util import key_match, regex_match_func
 import time
 from concurrent.futures import ThreadPoolExecutor
 import re
@@ -341,3 +341,79 @@ class TestDomainManager(TestRoleManager):
         self.assertTrue(rm.has_link("alice", "users", "domain1"))
         self.assertTrue(rm.has_link("alice", "user", "domain2"))
         self.assertFalse(rm.has_link("alice", "users", "domain2"))
+
+    def test_conditional_domain_pattern_link_condition(self):
+        deny = lambda *args: False
+        allow = lambda *args: True
+
+        rm = default_role_manager.ConditionalDomainManager(10)
+        rm.add_domain_matching_func(key_match)
+
+        rm.add_link("bob", "admin", "domain2")
+        rm.add_link("alice", "admin", "domain*")
+        rm.add_domain_link_condition_func("alice", "admin", "domain*", deny)
+        rm.add_link("carol", "admin", "domain*")
+        rm.add_domain_link_condition_func("carol", "admin", "domain*", allow)
+
+        for domain in ["domain*", "domain1", "domain2"]:
+            self.assertFalse(rm.has_link("alice", "admin", domain))
+            self.assertTrue(rm.has_link("carol", "admin", domain))
+        self.assertTrue(rm.has_link("bob", "admin", "domain2"))
+
+        rm.add_domain_link_condition_func("dave", "admin", "domain9", deny)
+        rm.add_link("dave", "admin", "domain9")
+        self.assertFalse(rm.has_link("dave", "admin", "domain9"))
+
+        param = lambda *args: len(args) == 1 and args[0] == "yes"
+        rm = default_role_manager.ConditionalDomainManager(10)
+        rm.add_link("alice", "admin", "domain*")
+        rm.add_domain_link_condition_func("alice", "admin", "domain*", param)
+        rm.set_domain_link_condition_func_params("alice", "admin", "domain*", "no")
+        rm.add_link("carol", "admin", "domain*")
+        rm.add_domain_link_condition_func("carol", "admin", "domain*", param)
+        rm.set_domain_link_condition_func_params("carol", "admin", "domain*", "yes")
+        rm.add_domain_matching_func(key_match)
+
+        for domain in ["domain*", "domain1"]:
+            self.assertFalse(rm.has_link("alice", "admin", domain))
+            self.assertTrue(rm.has_link("carol", "admin", domain))
+
+    def test_conditional_domain_link_condition_scope(self):
+        param = lambda *args: len(args) == 1 and args[0] == "yes"
+        deny = lambda *args: False
+
+        rm = default_role_manager.ConditionalDomainManager(10)
+        rm.add_link("alice", "admin", "domain1")
+        rm.add_domain_link_condition_func("alice", "admin", "domain1", param)
+        rm.set_domain_link_condition_func_params("alice", "admin", "domain1", "yes")
+        rm.add_link("bob", "admin", "domain2")
+        self.assertNotIn("alice", rm.rm_map["domain2"].all_roles)
+        self.assertTrue(rm.has_link("alice", "admin", "domain1"))
+        self.assertFalse(rm.has_link("alice", "admin", "domain2"))
+        rm.set_domain_link_condition_func_params("alice", "admin", "domain1", "no")
+        self.assertFalse(rm.has_link("alice", "admin", "domain1"))
+
+        rm.set_domain_link_condition_func_params("carol", "admin", "domain3", "yes")
+        rm.add_domain_link_condition_func("carol", "admin", "domain3", param)
+        rm.add_link("carol", "admin", "domain3")
+        self.assertTrue(rm.has_link("carol", "admin", "domain3"))
+
+        rm = default_role_manager.ConditionalDomainManager(10)
+        rm.add_link("bob", "admin", "domain1")
+        rm.add_link("alice", "admin", "domain*")
+        rm.add_domain_link_condition_func("alice", "admin", "domain*", deny)
+        rm.add_domain_matching_func(key_match)
+        for domain in ["domain*", "domain1"]:
+            self.assertFalse(rm.has_link("alice", "admin", domain))
+        self.assertTrue(rm.has_link("bob", "admin", "domain1"))
+
+        rm = default_role_manager.ConditionalDomainManager(10)
+        rm.add_domain_matching_func(key_match)
+        rm.add_domain_link_condition_func("alice", "admin", "domain*", deny)
+        rm.add_link("bob", "admin", "domain1")
+        rm.add_link("alice", "admin", "domain*")
+        for domain in ["domain*", "domain1"]:
+            self.assertFalse(rm.has_link("alice", "admin", domain))
+        rm.add_link("dave", "admin", "domain2")
+        rm.add_domain_link_condition_func("dave", "admin", "domain2", deny)
+        self.assertNotIn("dave", rm.rm_map["domain1"].all_roles)
