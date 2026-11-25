@@ -516,3 +516,55 @@ class TestTemporaryRoles(TestCase):
             self.assertFalse(rm.has_link("user%d" % i, "g1", "domain1"))
         self.assertTrue(rm.has_link("u1", "g1", "domain1"))
         self.assertEqual(set(rm.rm_map["domain1"].all_roles), roles)
+
+
+class TestConditionalRolesAndUsers(TestCase):
+    def test_get_roles_and_users_check_link_conditions(self):
+        allow = lambda *args: True
+        deny = lambda *args: False
+        param = lambda *args: len(args) == 1 and args[0] == "yes"
+
+        rm = default_role_manager.ConditionalRoleManager(10)
+        rm.add_link("alice", "admin")
+        rm.add_link("alice", "editor")
+        rm.add_link("alice", "viewer")
+        rm.add_link("bob", "editor")
+        rm.add_link_condition_func("alice", "admin", deny)
+        rm.add_link_condition_func("alice", "editor", allow)
+        rm.add_link_condition_func("alice", "viewer", param)
+        rm.set_link_condition_func_params("alice", "viewer", "no")
+
+        self.assertEqual(sorted(rm.get_roles("alice")), ["editor"])
+        self.assertEqual(rm.get_users("admin"), [])
+        self.assertEqual(sorted(rm.get_users("editor")), ["alice", "bob"])
+        self.assertEqual(rm.get_users("viewer"), [])
+
+        rm.set_link_condition_func_params("alice", "viewer", "yes")
+        self.assertEqual(sorted(rm.get_roles("alice")), ["editor", "viewer"])
+        self.assertEqual(rm.get_users("viewer"), ["alice"])
+
+    def test_domain_get_roles_and_users_check_link_conditions(self):
+        deny = lambda *args: False
+        allow = lambda *args: True
+
+        rm = default_role_manager.ConditionalDomainManager(10)
+        rm.add_link("alice", "admin", "domain1")
+        rm.add_link("alice", "editor", "domain1")
+        rm.add_link("bob", "admin", "domain1")
+        rm.add_link("alice", "admin", "domain2")
+        rm.add_domain_link_condition_func("alice", "admin", "domain1", deny)
+        rm.add_domain_link_condition_func("alice", "editor", "domain1", allow)
+
+        self.assertEqual(rm.get_roles("alice", "domain1"), ["editor"])
+        self.assertEqual(rm.get_users("admin", "domain1"), ["bob"])
+        self.assertEqual(rm.get_roles("alice", "domain2"), ["admin"])
+        self.assertEqual(rm.get_users("admin", "domain2"), ["alice"])
+
+        rm = default_role_manager.ConditionalDomainManager(10)
+        rm.add_domain_matching_func(key_match)
+        rm.add_link("alice", "admin", "domain*")
+        rm.add_link("bob", "admin", "domain1")
+        rm.add_domain_link_condition_func("alice", "admin", "domain*", deny)
+
+        self.assertEqual(rm.get_roles("alice", "domain1"), [])
+        self.assertEqual(rm.get_users("admin", "domain1"), ["bob"])
