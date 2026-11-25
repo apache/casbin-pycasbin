@@ -93,3 +93,12 @@ class TestDistributedApi(TestCaseBase):
         self.assertFalse(e.enforce("bob", "data2", "write"))
         self.assertFalse(e.enforce("data2_admin", "data2", "read"))
         self.assertFalse(e.enforce("data2_admin", "data2", "write"))
+
+    def test_clear_policy_self_clears_role_links(self):
+        e = self.get_enforcer(get_examples("rbac_model.conf"), get_examples("rbac_policy.csv"))
+        self.assertTrue(e.has_role_for_user("alice", "data2_admin"))
+
+        e.clear_policy_self(False)
+        e.add_policy_self(False, "p", "p", [["data2_admin", "data2", "read"]])
+        self.assertFalse(e.has_role_for_user("alice", "data2_admin"))
+        self.assertFalse(e.enforce("alice", "data2", "read"))

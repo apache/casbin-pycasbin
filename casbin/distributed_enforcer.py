@@ -112,6 +112,8 @@ class DistributedEnforcer(SyncedEnforcer):
                 self._e.logger.error("An exception occurred: " + e)
 
         self.get_model().clear_policy()
+        if self._e.auto_build_role_links:
+            self._e._clear_role_links()
 
     def update_policy_self(self, should_persist, sec, ptype, old_rule, new_rule):
         """

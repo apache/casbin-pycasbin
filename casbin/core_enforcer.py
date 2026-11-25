@@ -301,6 +301,14 @@ class CoreEnforcer:
         """clears all policy."""
 
         self.model.clear_policy()
+        if self.auto_build_role_links:
+            self._clear_role_links()
+
+    def _clear_role_links(self):
+        for rm in self.rm_map.values():
+            rm.clear()
+        for crm in self.cond_rm_map.values():
+            crm.clear()
 
     def init_rm_map(self):
         if "g" in self.model.keys():

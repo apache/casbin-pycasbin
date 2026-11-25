@@ -42,6 +42,15 @@ class TestRbacApi(TestCaseBase):
         self.assertTrue(e.has_role_for_user("alice", "data2_admin"))
         self.assertFalse(e.has_role_for_user("alice", "data1_admin"))
 
+    def test_clear_policy_clears_role_links(self):
+        e = self.get_enforcer(get_examples("rbac_model.conf"), get_examples("rbac_policy.csv"))
+        self.assertTrue(e.has_role_for_user("alice", "data2_admin"))
+
+        e.clear_policy()
+        e.add_policy("data2_admin", "data2", "read")
+        self.assertFalse(e.has_role_for_user("alice", "data2_admin"))
+        self.assertFalse(e.enforce("alice", "data2", "read"))
+
     def test_add_role_for_user(self):
         e = self.get_enforcer(get_examples("rbac_model.conf"), get_examples("rbac_policy.csv"))
         e.add_role_for_user("alice", "data1_admin")
