@@ -15,9 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from casbin.util import util
-
-from ..adapter import Adapter, load_policy_line
+from ..adapter import Adapter, load_policy_line, policy_line_to_csv
 
 
 class StringAdapter(Adapter):
@@ -43,16 +41,15 @@ class StringAdapter(Adapter):
 
     def save_policy(self, model):
         """saves all policy rules to the storage."""
-        tmp = []
-        for ptype, ast in model["p"].items():
-            for rule in ast.policy:
-                tmp.append(ptype + ", " + util.array_to_string(rule) + "\n")
+        lines = []
+        for sec in ["p", "g"]:
+            if sec not in model.keys():
+                continue
+            for ptype, ast in model[sec].items():
+                for rule in ast.policy:
+                    lines.append(policy_line_to_csv(ptype, rule))
 
-        for ptype, ast in model["g"].items():
-            for rule in ast.policy:
-                tmp.append(ptype + ", " + util.array_to_string(rule) + "\n")
-
-        self.line = "".join(tmp).rstrip("\n")
+        self.line = "\n".join(lines)
 
     def add_policy(self, sec, ptype, rule):
         """adds a policy rule to the storage."""

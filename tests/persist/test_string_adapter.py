@@ -107,3 +107,34 @@ g, alice, data_group_admin
         obj = "data1"
         act = "read"
         self.assertTrue(e.enforce(sub, obj, act))
+
+    def test_save_and_load_back(self):
+        conf = """
+[request_definition]
+r = sub, obj, act
+
+[policy_definition]
+p = sub, obj, act
+
+[policy_effect]
+e = some(where (p.eft == allow))
+
+[matchers]
+m = r.sub == p.sub && r.obj == p.obj && r.act == p.act
+"""
+        model = Model()
+        model.load_model_from_text(conf)
+        adapter = StringAdapter("p, alice, data1, read")
+        e = self.get_enforcer(model, adapter)
+        e.enable_auto_save(False)
+        e.add_policy("bob", "a, b", "read")
+        e.save_policy()
+        self.assertEqual(adapter.line, 'p, alice, data1, read\np, bob, "a, b", read')
+
+        e.load_policy()
+        self.assertEqual(e.get_policy(), [["alice", "data1", "read"], ["bob", "a, b", "read"]])
+
+        e.add_policy("bob", "d\np, mallory, data2, read", "read")
+        with self.assertRaises(ValueError):
+            e.save_policy()
+        self.assertNotIn("mallory", adapter.line)
