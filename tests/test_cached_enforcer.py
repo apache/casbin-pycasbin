@@ -511,6 +511,15 @@ class TestCacheInvalidation(TestCase):
         e.enable_enforce(True)
         self.assertFalse(e.enforce("alice", "data2", "read"))
 
+    def test_decisions_are_not_cached_while_enforce_is_disabled(self):
+        e = self.get_enforcer("basic_model.conf", "basic_policy.csv")
+        e.enable_enforce(False)
+        self.assertTrue(e.enforce("alice", "data2", "read"))
+        self.assertEqual(len(e.get_cache()), 0)
+
+        e.enabled = True
+        self.assertFalse(e.enforce("alice", "data2", "read"))
+
     def test_add_named_matching_func(self):
         e = casbin.CachedEnforcer(
             get_examples("rbac_with_pattern_model.conf"),

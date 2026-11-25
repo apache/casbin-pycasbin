@@ -163,7 +163,7 @@ class CacheSupport:
         """decides whether a "subject" can access a "object" with the operation "action",
         serving the answer from the cache when the same request was decided before.
         """
-        if not self._enable_cache or self._cache_would_be_stale():
+        if not self._enable_cache or not self.enabled or self._cache_would_be_stale():
             return super().enforce_ex(*rvals)
 
         key = self.get_cache_key(*rvals)
