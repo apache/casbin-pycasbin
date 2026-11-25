@@ -16,6 +16,7 @@
 # under the License.
 
 import logging
+import threading
 from collections import OrderedDict, namedtuple
 from enum import Enum
 
@@ -114,6 +115,7 @@ class RoleManager(RM):
         self.domain_matching_func = None
         self.all_links = dict()
         self.all_roles = dict()
+        self._query_lock = threading.RLock()
 
     def _rebuild(self):
         self.all_roles = dict()
@@ -149,6 +151,27 @@ class RoleManager(RM):
                     role.copy_from(pattern_role)
             self.all_roles[name] = role
         return self.all_roles[name]
+
+    def _remove_role(self, name):
+        """removes a role created only to answer a query, with the links copied from pattern roles."""
+        role = self.all_roles.pop(name, None)
+        if role is None:
+            return
+        for r in list(role.roles):
+            r.users.discard(role)
+        for u in list(role.users):
+            u.roles.discard(role)
+
+    def _query(self, names, fn):
+        """calls fn with the roles of names, removing afterwards the roles that did not exist before,
+        so that querying arbitrary names does not grow the role manager."""
+        with self._query_lock:
+            created = [name for name in dict.fromkeys(names) if name not in self.all_roles]
+            try:
+                return fn(*[self._get_role(name) for name in names])
+            finally:
+                for name in created:
+                    self._remove_role(name)
 
     def add_matching_func(self, fn):
         self.matching_func = fn
@@ -193,10 +216,7 @@ class RoleManager(RM):
                     role.remove_role(r)
 
     def has_link(self, name1, name2, *domain):
-        user = self._get_role(name1)
-        role = self._get_role(name2)
-
-        return self._has_link(name2, [user], self.max_hierarchy_level)
+        return self._query([name1, name2], lambda user, role: self._has_link(name2, [user], self.max_hierarchy_level))
 
     def _has_link(self, name, roles, level):
         if level <= 0 or len(roles) == 0:
@@ -211,12 +231,10 @@ class RoleManager(RM):
         return self._has_link(name, list(next_roles), level - 1)
 
     def get_roles(self, name, *domain):
-        user = self._get_role(name)
-        return [r.name for r in user.roles]
+        return self._query([name], lambda user: [r.name for r in user.roles])
 
     def get_users(self, name, *domain):
-        role = self._get_role(name)
-        return [u.name for u in role.users]
+        return self._query([name], lambda role: [u.name for u in role.users])
 
     def to_string(self):
         line = []
@@ -419,10 +437,10 @@ class ConditionalRoleManager(RoleManager, CRM):
         if name1 == name2 or (self.matching_func is not None and self._matching_fn(name1, name2)):
             return True
 
-        user = self._get_role(name1)
-        role = self._get_role(name2)
-
-        return self._has_link(role.name, [user], self.max_hierarchy_level, *domains)
+        return self._query(
+            [name1, name2],
+            lambda user, role: self._has_link(role.name, [user], self.max_hierarchy_level, *domains),
+        )
 
     def _has_link(self, target_name, roles, level, *domains):
         """use the Breadth First Search algorithm to traverse the Role tree

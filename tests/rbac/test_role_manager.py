@@ -126,7 +126,7 @@ class TestRoleManager(TestCase):
         self.assertTrue(rm.has_link("g2", "any_group"))
 
         self.assertEqual(sorted(rm.get_roles("u1")), sorted(["g1", "any_user"]))
-        self.assertEqual(sorted(rm.get_roles("u2")), sorted(["g2", "g1", r"g\d+", "any_user"]))
+        self.assertEqual(sorted(rm.get_roles("u2")), sorted(["g1", r"g\d+", "any_user"]))
         self.assertEqual(rm.get_roles(r"u\d+"), ["any_user"])
         self.assertEqual(rm.get_roles("u3"), ["any_user"])
         self.assertEqual(rm.get_roles("g1"), ["any_group"])
@@ -462,3 +462,57 @@ class TestDomainManager(TestRoleManager):
         self.assertTrue(rm.has_link("alice", "admin", "domain2"))
         self.assertTrue(rm.has_link("bob", "admin", "domain2"))
         self.assertFalse(rm.has_link("bob", "admin", "domain1"))
+
+
+class TestTemporaryRoles(TestCase):
+    def test_queries_do_not_store_roles(self):
+        rm = default_role_manager.RoleManager(10)
+        rm.add_link("u1", "g1")
+        rm.add_link("g1", "g2")
+        roles = set(rm.all_roles)
+
+        for i in range(100):
+            self.assertFalse(rm.has_link("user%d" % i, "g1"))
+            self.assertFalse(rm.has_link("u1", "role%d" % i))
+            self.assertEqual(rm.get_roles("user%d" % i), [])
+            self.assertEqual(rm.get_users("role%d" % i), [])
+        self.assertTrue(rm.has_link("u1", "g2"))
+        self.assertEqual(set(rm.all_roles), roles)
+
+    def test_queries_with_matching_func_do_not_store_roles(self):
+        rm = default_role_manager.RoleManager(10)
+        rm.add_matching_func(regex_match_func)
+        rm.add_link(r"u\d+", "g1")
+        rm.add_link("alice", r"book/\d+")
+        rm.add_link("book/1", "reader")
+        roles = set(rm.all_roles)
+
+        for i in range(100):
+            self.assertTrue(rm.has_link("u%d" % i, "g1"))
+            self.assertFalse(rm.has_link("x%d" % i, "g1"))
+            self.assertTrue(rm.has_link("alice", "book/%d" % (i + 2)))
+        self.assertTrue(rm.has_link("alice", "reader"))
+        self.assertEqual(rm.get_roles("u7"), ["g1"])
+        self.assertEqual(set(rm.all_roles), roles)
+        for role in rm.all_roles.values():
+            self.assertTrue(all(r.name in roles for r in role.roles))
+            self.assertTrue(all(u.name in roles for u in role.users))
+
+    def test_conditional_queries_do_not_store_roles(self):
+        rm = default_role_manager.ConditionalRoleManager(10)
+        rm.add_link("u1", "g1")
+        roles = set(rm.all_roles)
+
+        for i in range(100):
+            self.assertFalse(rm.has_link("user%d" % i, "g1"))
+            self.assertFalse(rm.has_link("u1", "role%d" % i))
+        self.assertTrue(rm.has_link("u1", "g1"))
+        self.assertEqual(set(rm.all_roles), roles)
+
+        rm = default_role_manager.ConditionalDomainManager(10)
+        rm.add_link("u1", "g1", "domain1")
+        roles = set(rm.rm_map["domain1"].all_roles)
+        for i in range(100):
+            self.assertFalse(rm.has_link("user%d" % i, "g1", "domain1"))
+        self.assertTrue(rm.has_link("u1", "g1", "domain1"))
+        self.assertEqual(set(rm.rm_map["domain1"].all_roles), roles)
