@@ -16,7 +16,6 @@
 # under the License.
 
 import os
-import random
 
 import casbin
 
@@ -26,21 +25,19 @@ def get_examples(path):
     return os.path.abspath(examples_path + path)
 
 
-def get_enforcer(model=None, adapter=None):
-    return casbin.Enforcer(
-        model,
-        adapter,
-    )
+def _policy(i):
+    return [f"user{i}", f"data{i // 10}", "read"]
+
+
+def _seeded_enforcer(user_num):
+    e = casbin.Enforcer(get_examples("basic_model.conf"))
+    e.add_policies([_policy(i) for i in range(user_num)])
+    return e
 
 
 def _benchmark_has_policy(benchmark, user_num):
-    e = get_enforcer(get_examples("basic_model.conf"))
-
-    e.add_policies({(f"user{i}", f"data{i // 10}" "read") for i in range(user_num)})
-
-    @benchmark
-    def run_benchmark():
-        e.has_policy(f"user{random.randint(0, user_num)}", f"data{random.randint(0, user_num) // 10}", "read")
+    e = _seeded_enforcer(user_num)
+    assert benchmark(e.has_policy, *_policy(user_num - 1))
 
 
 def test_benchmark_has_policy_small(benchmark):
@@ -56,17 +53,14 @@ def test_benchmark_has_policy_large(benchmark):
 
 
 def _benchmark_add_policy(benchmark, user_num):
-    e = get_enforcer(get_examples("basic_model.conf"))
+    e = _seeded_enforcer(user_num + 1)
+    target = _policy(user_num)
 
-    e.add_policies({(f"user{i}", f"data{i // 10}" "read") for i in range(user_num)})
+    def setup():
+        assert e.remove_policy(*target)
 
-    @benchmark
-    def run_benchmark():
-        e.add_policy(
-            f"user{random.randint(0, user_num) + user_num}",
-            f"data{(random.randint(0, user_num) + user_num) // 10}",
-            "read",
-        )
+    assert benchmark.pedantic(e.add_policy, args=target, setup=setup, rounds=50)
+    assert len(e.get_policy()) == user_num + 1
 
 
 def test_benchmark_add_policy_small(benchmark):
@@ -82,13 +76,14 @@ def test_benchmark_add_policy_large(benchmark):
 
 
 def _benchmark_remove_policy(benchmark, user_num):
-    e = get_enforcer(get_examples("basic_model.conf"))
+    e = _seeded_enforcer(user_num - 1)
+    target = _policy(user_num - 1)
 
-    e.add_policies({(f"user{i}", f"data{i // 10}" "read") for i in range(user_num)})
+    def setup():
+        assert e.add_policy(*target)
 
-    @benchmark
-    def run_benchmark():
-        e.remove_policy(f"user{random.randint(0, user_num)}", f"data{random.randint(0, user_num) // 10}", "read")
+    assert benchmark.pedantic(e.remove_policy, args=target, setup=setup, rounds=50)
+    assert len(e.get_policy()) == user_num - 1
 
 
 def test_benchmark_remove_policy_small(benchmark):
